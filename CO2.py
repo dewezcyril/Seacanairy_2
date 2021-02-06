@@ -13,11 +13,24 @@ from smbus2 import SMBus, i2c_msg
 
 
 # I²C address of the CO2 device
-CO2_address = 0x33
+CO2_address: int = 0x33
 
 
 #emplacement variable
 bus = SMBus(1)
+
+
+def CO2_read(register, length)
+    """
+    Read data from a certain customer memory address on th CO2 sensor.
+    :param repository: int
+    :param length: int
+    :return: 
+    """
+    reading = bus.read_i2c_block_data(CO2_address, register, length)
+    #TODO: allow the user to skip the register if not needed
+    #TODO: convert data read into an integrer (if needed)
+    return reading
 
 
 def CO2_request_measurement():
@@ -118,6 +131,9 @@ def CO2_get_CO2_P():
     # CO2_get_CO2_P()[2] = pressure
 
     return CO2_P
+
+
+
 
 
 #Execute the function above
