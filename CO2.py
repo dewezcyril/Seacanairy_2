@@ -82,7 +82,7 @@ def CO2_request_measurement():
     logging.debug("Status of CO2 sensor is ", status)
 
     if (status != 0):
-        logging.warning("CO2 sensor status is not ok")
+        logging.critical("CO2 sensor status is not ok")
 
     return status
 
@@ -129,8 +129,8 @@ def CO2_get_RH_T():
         logging.debug("CRC8 is correct. Temperature transmission is correct")
 
     else:
-        logging.warning("CRC8 check found mistake in the I²C transmission for temperature from CO2 sensor")
-        logging.warning("CRC8 from sensor is ", crc8, " and CRC8 calculation is ", reading[5])
+        logging.error("CRC8 check found mistake in the I²C transmission for temperature from CO2 sensor")
+        logging.error("CRC8 from sensor is ", reading[2], " and CRC8 calculation is ", crc8)
 
     check.update(reading[3])
     check.update(reading[4])
@@ -140,8 +140,8 @@ def CO2_get_RH_T():
         logging.debug("CRC8 is correct. Relative humidity transmission is correct")
 
     else:
-        logging.warning("CRC8 check found mistake in the I²C transmission for relative humidity")
-        logging.warning("CRC8 from sensor is ", crc8, " and CRC8 calculation is ", reading[5])
+        logging.error("CRC8 check found mistake in the I²C transmission for relative humidity")
+        logging.error("CRC8 from sensor is ", reading[5], " and CRC8 calculation is ", crc8)
 
 
     return RH_T
@@ -178,18 +178,49 @@ def CO2_get_CO2_P():
     CO2_average = (reading[0] << 8) + reading[1]
     print("CO2 average is: ", CO2_average, " ppm")
 
-    # TODO: CRC8 calculation for reading[2]
-
     CO2_raw = (reading[3] << 8) + reading[4]
     print("CO2 instant is: ", CO2_raw, " ppm")
-
-    # TODO: CRC8 calculation for reading[5]
 
     # reading << 8 = shift bytes 8 times to the left, equally, add 8 times 0 on the right
     pressure = (((reading[6]) << 8) + reading[7]) / 10
     print("Pressure is: ", pressure, " mbar")
 
     CO2_P = [CO2_average, CO2_raw, pressure]  # create a chain of values to be returned by the function
+
+    # checking for temperature
+    check.update(reading[0])
+    check.update(reading[1])
+    crc8 = check.hexdigest()
+    logging.debug("CRC8 is: ", crc8)
+
+    if crc8 == reading[2]:
+        logging.debug("CRC8 is correct. CO2 average transmission is correct")
+
+    else:
+        logging.error("CRC8 check found mistake in the I²C transmission for CO2 average")
+        logging.error("CRC8 from sensor is ", reading[2], " and CRC8 calculation is ",  crc8)
+
+    check.update(reading[3])
+    check.update(reading[4])
+    crc8 = check.hexdigest()
+
+    if crc8 == reading[5]:
+        logging.debug("CRC8 is correct. CO2 raw transmission is correct")
+
+    else:
+        logging.error("CRC8 check found mistake in the I²C transmission for CO2 raw")
+        logging.error("CRC8 from sensor is ", reading[5], " and CRC8 calculation is ", crc8)
+
+        check.update(reading[6])
+        check.update(reading[7])
+        crc8 = check.hexdigest()
+
+        if crc8 == reading[8]:
+            logging.debug("CRC8 is correct. Pressure transmission is correct")
+
+        else:
+            logging.error("CRC8 check found mistake in the I²C transmission for Pressure")
+            logging.error("CRC8 from sensor is ", reading[8], " and CRC8 calculation is ", crc8)
 
     return CO2_P
 
@@ -204,17 +235,25 @@ def time_interval(sec):
     :param timestamp: seconds
     :return: 0 for success, 1 for error
     """
-    t = bytes(sec * 10)
-    # TODO: CRC8 calculation, unless we're happy with 20 seconds
-    CRC8 = 0xB5
-    bus.write_i2c_block_data(CO2_address, 0x71, 0x54, 0x00, t, CRC8)
+    t = hex(sec * 10)
+
+    check.update(0x71)
+    check.update(0x54)
+    check.update(t)
+    crc8 = check.hexdigest()
+    logging.debug("CRC8 calculation for timestamp change is ", crc8)
+
+    bus.write_i2c_block_data(CO2_address, 0x71, 0x54, 0x00, t, crc8)
     sleep()
     reading = read(16)
-    if reading == t:
-        print("Measurement timestamp set successfully on ", sec, " seconds")
+    set = (reading[0] << 8 + reading[1]) / 10
+    if  int(set) == sec:
+        logging.info("Measurement timestamp set successfully on ", int(set), " seconds")
+        print("Measurement timestamp set successfully on ", int(set), " seconds")
         return 0
     else:
-        print("Failed to set measurement timestamp to ", sec, " seconds")
+        logging.error("Failed to set measurement timestamp to ", int(set), " seconds")
+        logging.error("Timestamp remains on ", )
         return 1
 
 
@@ -253,7 +292,7 @@ def write_calibration(calibration,  offset, gain, lower_limit, upper_limit):
     check.update(hex(upper_limit))
     crc8 = check.hexdigest()
 
-    bus.write_i2c_block_data(CO2_address, 0x71, 0x54, index, GainValue, LL, UL, crc8)
+    bus.write_i2c_block_data(CO2_address, 0x71, 0x54, index, GainValue, lower_limit, upper_limit, crc8)
 
 # ---------------------------------------------------------------------
 # Test Execution
