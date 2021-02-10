@@ -32,7 +32,12 @@ check = crc8.crc8()
 
 # logging
 import logging
+import os
 log_file = './log/CO2.log'
+if os.path.isfile(log_file)!=True:
+    os.makedirs(os.path.dirname(log_file), exist_ok=True)
+
+
 logging.basicConfig(filename=log_file, level=logging.DEBUG, format='%(asctime)s %(levelname)s %(name)s %(message)s')
 logger=logging.getLogger(__name__)
 
@@ -46,22 +51,24 @@ def read(length):
     :param length: int, number of bytes to read
     :return: reading
     """
-    reading = bus.read_i2c_block_data(CO2_address, length)
+    msg = i2c_msg.read(CO2_address, length)
+    bus.i2c_rdwr(msg)
+    reading = msg
+    # It seems that the function return the reading in the same function as the one between brackets
+    # reading = bus.read_i2c_block_data(CO2_address, length)
     logging.debug("I²C reading is: ", reading)
-    # TODO: check that this is the good function. Wiring needed.
-    # TODO: convert data read into an integer (if needed)
 
     return reading
 
 
-def write(data1, data2):
+def write(data):
     """
     Write two data only to the CO2 sensor.
-    :param data1: hexadecimal
-    :param data2: hexadecimal
+    :param data: list of bytes to write
     """
-
-    bus.write_i2c_block_data(CO2_address, data1, data2)
+    msg = i2c_msg.write(CO2_address, data)
+    bus.i2c_rdwr(msg)
+    #bus.write_i2c_block_data(CO2_address, data1, data2)
     sleep()
 
     return
@@ -98,7 +105,7 @@ def CO2_get_RH_T():
     :return:  List of int[Relative Humidity, Temperature]
     """
 
-    write(0xE0, 0x00)
+    write([0xE0, 0x00])
 
     sleep()  # Copy-pasted from the code of Lukas
 
@@ -122,10 +129,10 @@ def CO2_get_RH_T():
     # checking for temperature
     check.update(reading[0])
     check.update(reading[1])
-    crc8 = check.hexdigest()
-    logging.debug("CRC8 is: ", crc8)
+    checksum = check.hexdigest()
+    logging.debug("CRC8 is: ", checksum)
 
-    if crc8 == reading[2]:
+    if checksum == reading[2]:
         logging.debug("CRC8 is correct. Temperature transmission is correct")
 
     else:
@@ -134,14 +141,14 @@ def CO2_get_RH_T():
 
     check.update(reading[3])
     check.update(reading[4])
-    crc8 = check.hexdigest()
+    checksum = check.hexdigest()
 
-    if crc8 == reading[5]:
+    if checksum == reading[5]:
         logging.debug("CRC8 is correct. Relative humidity transmission is correct")
 
     else:
         logging.error("CRC8 check found mistake in the I²C transmission for relative humidity")
-        logging.error("CRC8 from sensor is ", reading[5], " and CRC8 calculation is ", crc8)
+        logging.error("CRC8 from sensor is ", reading[5], " and CRC8 calculation is ", checksum)
 
 
     return RH_T
@@ -161,7 +168,7 @@ def CO2_get_CO2_P():
     """
     print("Reading of CO2 and pressure...")
 
-    write(0xE0, 0x27)
+    write([0xE0, 0x27])
     # write function should automatically  add a 0 at the end, just after the CO2_Address
     # If not, write on address 0x66 (this include the mandatory 1 of the I²C communication)
 
@@ -190,37 +197,37 @@ def CO2_get_CO2_P():
     # checking for temperature
     check.update(reading[0])
     check.update(reading[1])
-    crc8 = check.hexdigest()
-    logging.debug("CRC8 is: ", crc8)
+    checksum = check.hexdigest()
+    logging.debug("CRC8 is: ", checksum)
 
-    if crc8 == reading[2]:
+    if checksum == reading[2]:
         logging.debug("CRC8 is correct. CO2 average transmission is correct")
 
     else:
         logging.error("CRC8 check found mistake in the I²C transmission for CO2 average")
-        logging.error("CRC8 from sensor is ", reading[2], " and CRC8 calculation is ",  crc8)
+        logging.error("CRC8 from sensor is ", reading[2], " and CRC8 calculation is ",  checksum)
 
     check.update(reading[3])
     check.update(reading[4])
-    crc8 = check.hexdigest()
+    checksum = check.hexdigest()
 
-    if crc8 == reading[5]:
+    if checksum == reading[5]:
         logging.debug("CRC8 is correct. CO2 raw transmission is correct")
 
     else:
         logging.error("CRC8 check found mistake in the I²C transmission for CO2 raw")
-        logging.error("CRC8 from sensor is ", reading[5], " and CRC8 calculation is ", crc8)
+        logging.error("CRC8 from sensor is ", reading[5], " and CRC8 calculation is ", checksum)
 
         check.update(reading[6])
         check.update(reading[7])
-        crc8 = check.hexdigest()
+        checksum = check.hexdigest()
 
-        if crc8 == reading[8]:
+        if checksum == reading[8]:
             logging.debug("CRC8 is correct. Pressure transmission is correct")
 
         else:
             logging.error("CRC8 check found mistake in the I²C transmission for Pressure")
-            logging.error("CRC8 from sensor is ", reading[8], " and CRC8 calculation is ", crc8)
+            logging.error("CRC8 from sensor is ", reading[8], " and CRC8 calculation is ", checksum)
 
     return CO2_P
 
@@ -240,10 +247,11 @@ def time_interval(sec):
     check.update(0x71)
     check.update(0x54)
     check.update(t)
-    crc8 = check.hexdigest()
-    logging.debug("CRC8 calculation for timestamp change is ", crc8)
+    checksum = check.hexdigest()
+    logging.debug("CRC8 calculation for timestamp change is ", checksum)
 
-    bus.write_i2c_block_data(CO2_address, 0x71, 0x54, 0x00, t, crc8)
+    write([0x71, 0x54, 0x00, t, checksum])
+    # bus.write_i2c_block_data(CO2_address, 0x71, 0x54, 0x00, t, checksum)
     sleep()
     reading = read(16)
     set = (reading[0] << 8 + reading[1]) / 10
@@ -290,9 +298,10 @@ def write_calibration(calibration,  offset, gain, lower_limit, upper_limit):
     check.update(hex(GainValue))
     check.update(hex(lower_limit))
     check.update(hex(upper_limit))
-    crc8 = check.hexdigest()
+    checksum = check.hexdigest()
 
-    bus.write_i2c_block_data(CO2_address, 0x71, 0x54, index, GainValue, lower_limit, upper_limit, crc8)
+    write([0x71, 0x54, index, GainValue, lower_limit, upper_limit, checksum])
+    #bus.write_i2c_block_data(CO2_address, 0x71, 0x54, index, GainValue, lower_limit, upper_limit, checksum)
 
 # ---------------------------------------------------------------------
 # Test Execution

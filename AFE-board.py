@@ -4,12 +4,12 @@ from datetime import datetime
 import time
 
 #get the locations of the input on the rpi and ADC
-import smbus
+# import smbus
 import sys
 import subprocess
 
 #ports location
-from smbus import SMBus
+from smbus2 import SMBus
 from sys import exit
 
 #emplacement variable
@@ -99,15 +99,23 @@ ch0_mult = 1000 #multiplication of the value given by the rpi
 
 now = datetime.now()
 
+def ADC_reading():
+    AFE_temp()
+    AFE_NO2()
+    AFE_Ox()
+    AFE_SO2()
+    AFE_CO()
+
+
 def AFE_temp():
     """
     Measure temperature from the Alphasense 4-AFE Board via ADC
     :return: Temperature (volts)
     """
-    Tempv = ch0_mult * getADCreading(address,channel0)
+    tempv = ch0_mult * getADCreading(address,channel0)
     logging.debug("Tension from temperature sensor (AFE board) is ", tempv, " volts")
     time.sleep(sleep)
-    return Tempv
+    return tempv
 
 def AFE_NO2():
     """
@@ -137,7 +145,7 @@ def AFE_Ox():
     return [Oxv_main, Oxv_aux]
 
 
-def ADC_SO2():
+def AFE_SO2():
     """
     Measure SO2 from the Alphasense 4-AFE Board via ADC
     :return:
@@ -151,7 +159,7 @@ def ADC_SO2():
     return [SO2v_main, SO2v_aux]
 
 
-def ADC_CO():
+def AFE_CO():
     """
     Measure CO from the Alphasense 4-AFE Board via ADC
     :return:
