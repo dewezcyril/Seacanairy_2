@@ -1,4 +1,15 @@
-from Start_to_tshirp import
+from Start_to_tshirp import AFE_reading as ADC
+
+# ----------------------------------------------------------------------------------------------------------------------
+# logging
+# ----------------------------------------------------------------------------------------------------------------------
+log_file = './log/seacanairy2.log'
+logging.basicConfig(filename=log_file, level=logging.DEBUG, format='%(asctime)s %(levelname)s %(name)s %(message)s')
+logger=logging.getLogger(__name__)
+
+
+
+
 
 #data file location
 fdel = open("/home/pi/Desktop/Tshirp.odt", "w")
@@ -9,3 +20,4 @@ fdel.write(" ")
 while (True):
     #open the file to write the data
     f = open("Tshirp.rtf", "a")
+
