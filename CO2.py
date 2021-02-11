@@ -1,5 +1,5 @@
 """
-Libraries for the use of E+E Elektronik EE894 CO2 sensor
+Libraries for the use of E+E Elektronik EE894 CO2 sensor via I²C communication
 
 Execution at the end of the functions written above
 """
@@ -42,6 +42,7 @@ if not os.path.isfile(log_file):
 logging.basicConfig(filename=log_file, level=logging.INFO, format='%(asctime)s %(levelname)s %(name)s %(message)s',
                     datefmt='%m/%d/%Y %I:%M:%S %p')
 logger = logging.getLogger(__name__)
+
 
 def sleep():
     time.sleep(0.5)
@@ -109,6 +110,7 @@ def CO2_request_measurement():
 
     except:
         logging.error('Error while sending status to CO2 sensor')
+        return 0
 
 
 def CO2_get_RH_T():
@@ -250,10 +252,11 @@ def CO2_get_CO2_P():
                 logging.error('CRC8 check found mistake in the I²C transmission for Pressure')
                 logging.error('CRC8 from sensor is %i and CRC8 calculation is ', reading[8], checksum)
 
-        return CO2_P
-
     except:
         logging.error('Error while reading CO2 and Pressure')
+        CO2_P = [0, 0]
+
+    return CO2_P
 
 
 # ---------------------------------------------------------------------
