@@ -3,16 +3,12 @@ Libraries for the use of E+E Elektronik EE894 CO2 sensor via I²C communication
 
 Execution at the end of the functions written above
 """
+# --------------------------------------------------------
+# USEFUL VARIABLES
+# --------------------------------------------------------
 
 # get the time
-from datetime import date
-from datetime import datetime
 import time
-
-# get the locations of the input on the rpi and ADC (imported from Lukas code)
-# import smbus
-# import sys
-# import subprocess
 
 # smbus2 is the new smbus, allow more than 32 bits writing/reading
 from smbus2 import SMBus, i2c_msg
@@ -26,12 +22,15 @@ i = 0
 # emplacement variable
 bus = SMBus(1)
 
-# CRC8 checksum calculation
+# --------------------------------------------------------
+# CRC8 CHECKSUM CALCULATION
+# --------------------------------------------------------
 import crc8
-
 check = crc8.crc8()
 
-# logging
+# --------------------------------------------------------
+# LOGGING SETTINGS
+# --------------------------------------------------------
 import logging
 import os
 
@@ -39,10 +38,12 @@ log_file = './log/CO2.log'
 if not os.path.isfile(log_file):
     os.makedirs(os.path.dirname(log_file), exist_ok=True)
 
-logging.basicConfig(filename=log_file, level=logging.INFO, format='%(asctime)s %(levelname)s %(name)s %(message)s',
+logging.basicConfig(filename=log_file, level=logging.DEBUG, format='%(asctime)s %(levelname)s %(name)s %(message)s',
                     datefmt='%m/%d/%Y %I:%M:%S %p')
 logger = logging.getLogger(__name__)
+# level = logging.DEBUG should display everything on the screen
 
+# --------------------------------------------------------
 
 def sleep():
     time.sleep(0.5)
@@ -59,9 +60,9 @@ def read(length):
         msg = i2c_msg.read(CO2_address, length)
         bus.i2c_rdwr(msg)
         reading = msg
-        # It seems that the function return the reading in the same function as the one between brackets
+        # It seems that the function return the reading in the same function as the one between brackets (msg)
         # reading = bus.read_i2c_block_data(CO2_address, length)
-        logging.debug('I²C reading is: %f', reading)
+        logging.debug('I²C reading is: %i', reading)
 
     except:
         logging.error('Error while reading data from CO2 sensor on I²C')
@@ -79,11 +80,11 @@ def write(data):
         logging.debug('I²C writing process to CO2 sensor')
         msg = i2c_msg.write(CO2_address, data)
         bus.i2c_rdwr(msg)
-        # bus.write_i2c_block_data(CO2_address, data1, data2)
+        # bus.write_i2c_block_data(CO2_address, data[0], data[1])
         sleep()
 
     except:
-        logging.error('Error while writing %f via I²C to the CO2 sensor', data)
+        logging.error('Error while writing %i via I²C to the CO2 sensor', data)
 
     return
 
@@ -141,7 +142,9 @@ def CO2_get_RH_T():
         relative_humidity = ((reading[2] << 8) + reading[3]) / 100
 
         print("Temperature from CO2 sensor is: ", temperature, " °C")
+        logging.info('Temperature from CO2 sensor is: %i °C', temperature)  # to keep a trace of the value in file
         print("Relative humidity is: ", relative_humidity, " %RH")
+        logging.info('Relative humidity is: %i %RH', relative_humidity)     # to keep a trace of the value in file
 
         RH_T = [relative_humidity, temperature]  # create a chain of values to be returned by the function
 
