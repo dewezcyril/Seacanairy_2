@@ -38,7 +38,7 @@ log_file = './log/CO2.log'
 if not os.path.isfile(log_file):
     os.makedirs(os.path.dirname(log_file), exist_ok=True)
 
-logging.basicConfig(filename=log_file, level=logging.DEBUG, format='%(asctime)s %(levelname)s %(name)s %(message)s',
+logging.basicConfig(filename=log_file, level=logging.DEBUG, format='%(asctime)s %(levelname)s %(name)s %(log)s',
                     datefmt='%m/%d/%Y %I:%M:%S %p')
 logger = logging.getLogger(__name__)
 # level = logging.DEBUG should display everything on the screen
@@ -55,17 +55,20 @@ def read(length):
     :param length: int, number of bytes to read
     :return: reading
     """
-    logging.debug('I²C reading process from CO2 sensor')
+    log = 'I²C reading process from CO2 sensor'
+    logging.debug(log)
     try:
         msg = i2c_msg.read(CO2_address, length)
         bus.i2c_rdwr(msg)
         reading = msg
         # It seems that the function return the reading in the same function as the one between brackets (msg)
         # reading = bus.read_i2c_block_data(CO2_address, length)
-        logging.debug('I²C reading is: %i', reading)
+        log = "I²C reading is: " + str(reading)
+        logging.debug(log)
 
     except:
-        logging.error('Error while reading data from CO2 sensor on I²C')
+        log = "Error while reading data from CO2 sensor on I²C"
+        logging.error(log)
         return 0
 
     return reading
@@ -77,14 +80,16 @@ def write(data):
     :param data: list of bytes to write
     """
     try:
-        logging.debug('I²C writing process to CO2 sensor')
+        log = "I²C writing process to CO2 sensor"
+        logging.debug(log)
         msg = i2c_msg.write(CO2_address, data)
         bus.i2c_rdwr(msg)
         # bus.write_i2c_block_data(CO2_address, data[0], data[1])
         sleep()
 
     except:
-        logging.error('Error while writing %i via I²C to the CO2 sensor', data)
+        log = "Error while writing " + str(data) + " via I²C to the CO2 sensor"
+        logging.error(log)
 
     return
 
@@ -102,15 +107,18 @@ def CO2_request_measurement():
 
     try:
         status = bus.read_byte_data(CO2_address, 0x71)
-        logging.debug('Status of CO2 sensor is %i' % status)
+        log = "Error while writing " + str(status) + " via I²C to the CO2 sensor"
+        logging.debug(log)
 
         if (status != 0):
-            logging.critical('CO2 sensor status is not ok')
+            log = "CO2 sensor status is not ok"
+            logging.critical(log)
 
         return status
 
     except:
-        logging.error('Error while sending status to CO2 sensor')
+        log = "Error while sending status to CO2 sensor"
+        logging.error(log)
         return 0
 
 
@@ -124,7 +132,8 @@ def CO2_get_RH_T():
 
     :return:  List of int[Relative Humidity, Temperature]
     """
-    logging.debug('Read RH and Temperature from CO2 sensor')
+    log = "Read RH and Temperature from CO2 sensor"
+    logging.debug(log)
 
     try:
         write([0xE0, 0x00])
@@ -141,10 +150,12 @@ def CO2_get_RH_T():
         temperature = ((reading[0] << 8) + reading[1]) / 100 - 273.15
         relative_humidity = ((reading[2] << 8) + reading[3]) / 100
 
-        print("Temperature from CO2 sensor is: ", temperature, " °C")
-        logging.info('Temperature from CO2 sensor is: %i °C', temperature)  # to keep a trace of the value in file
-        print("Relative humidity is: ", relative_humidity, " %RH")
-        logging.info('Relative humidity is: %i %RH', relative_humidity)     # to keep a trace of the value in file
+        log = "Temperature from CO2 sensor is: " + str(temperature) + " °C"
+        print(log)
+        logging.info(log)     # to keep a trace of the value in during developping
+        log = "Relative humidity is: " + str(relative_humidity) + " %RH"
+        print(log)
+        logging.info(log)     # to keep a trace of the value in file
 
         RH_T = [relative_humidity, temperature]  # create a chain of values to be returned by the function
 
@@ -152,31 +163,40 @@ def CO2_get_RH_T():
         check.update(reading[0])
         check.update(reading[1])
         checksum = check.hexdigest()
-        logging.debug('CRC8 is: %i', checksum)
+        log = "CRC8 is: " + str(checksum)
+        logging.debug(log)
 
         if checksum == reading[2]:
-            logging.debug('CRC8 is correct. Temperature transmission is correct')
+            log = "CRC8 is correct. Temperature transmission is correct"
+            logging.debug(log)
 
         else:
-            logging.error('CRC8 check found mistake in the I²C transmission for temperature from CO2 sensor')
-            logging.error('CRC8 from sensor is %i and CRC8 calculation is %i', reading[2], crc8)
+            log = "CRC8 check found mistake in the I²C transmission for temperature from CO2 sensor"
+            logging.error(log)
+            log = "CRC8 from sensor is " + str(reading[2]) + " and CRC8 calculation is " + str(crc8)
+            logging.error(log)
 
         check.update(reading[3])
         check.update(reading[4])
         checksum = check.hexdigest()
-        logging.debug('CRC8 is: %i', checksum)
+        log = "CRC8 is: " + str(checksum)
+        logging.debug(log)
 
         if checksum == reading[5]:
-            logging.debug('CRC8 is correct. Relative humidity transmission is correct')
+            log = "CRC8 is correct. Relative humidity transmission is correct"
+            logging.debug(log)
 
         else:
-            logging.error('CRC8 check found mistake in the I²C transmission for relative humidity')
-            logging.error('CRC8 from sensor is %i and CRC8 calculation is %i', reading[5], checksum)
+            log = "CRC8 check found mistake in the I²C transmission for relative humidity"
+            logging.error(log)
+            log = "CRC8 from sensor is " + str(reading[5]) + " and CRC8 calculation is " + str(checksum)
+            logging.error(log)
 
         return RH_T
 
     except:
-        logging.error('Error while reading RH and Temperature from the CO2 sensor')
+        log = "Error while reading RH and Temperature from the CO2 sensor"
+        logging.error(log)
 
 
 def CO2_get_CO2_P():
@@ -191,7 +211,8 @@ def CO2_get_CO2_P():
 
     :return: List of int[CO2 (average), CO2 (instant measurement), Atmospheric Pressure)
     """
-    logging.debug("Reading of CO2 and pressure")
+    log = "Reading of CO2 and pressure"
+    logging.debug(log)
 
     try:
 
@@ -223,40 +244,52 @@ def CO2_get_CO2_P():
         check.update(reading[0])
         check.update(reading[1])
         checksum = check.hexdigest()
-        logging.debug('CRC8 is: %i', checksum)
+        log = "CRC8 is: " + str(checksum)
+        logging.debug(log)
 
         if checksum == reading[2]:
-            logging.debug('CRC8 is correct. CO2 average transmission is correct')
+            log = "CRC8 is correct. CO2 average transmission is correct"
+            logging.debug(log)
 
         else:
-            logging.error('CRC8 check found mistake in the I²C transmission for CO2 average')
-            logging.error('CRC8 from sensor is %i and CRC8 calculation is %i', reading[2], checksum)
+            log = "CRC8 check found mistake in the I²C transmission for CO2 average"
+            logging.error(log)
+            log = "CRC8 from sensor is " + str(reading[2]) + " and CRC8 calculation is " + str(checksum)
+            logging.error(log)
 
         check.update(reading[3])
         check.update(reading[4])
         checksum = check.hexdigest()
-        logging.debug('CRC8 is: %i', checksum)
+        log = "CRC8 is: " + str(checksum)
+        logging.debug(log)
 
         if checksum == reading[5]:
-            logging.debug('CRC8 is correct. CO2 raw transmission is correct')
+            log = "CRC8 is correct. CO2 raw transmission is correct"
+            logging.debug(log)
 
         else:
-            logging.error('CRC8 check found mistake in the I²C transmission for CO2 raw')
-            logging.error('CRC8 from sensor is %i and CRC8 calculation is %i', reading[5], checksum)
+            log = "CRC8 check found mistake in the I²C transmission for CO2 raw"
+            logging.error(log)
+            log = "CRC8 from sensor is " + str(reading[5]) + "  and CRC8 calculation is " + str(checksum)
+            logging.error(log)
 
             check.update(reading[6])
             check.update(reading[7])
             checksum = check.hexdigest()
 
             if checksum == reading[8]:
-                logging.debug('CRC8 is correct. Pressure transmission is correct')
+                log = "CRC8 is correct. Pressure transmission is correct"
+                logging.debug(log)
 
             else:
-                logging.error('CRC8 check found mistake in the I²C transmission for Pressure')
-                logging.error('CRC8 from sensor is %i and CRC8 calculation is ', reading[8], checksum)
+                log = "CRC8 check found mistake in the I²C transmission for Pressure"
+                logging.error(log)
+                log = "CRC8 from sensor is " + str(reading[8]) + " and CRC8 calculation is " + str(checksum)
+                logging.error(log)
 
     except:
-        logging.error('Error while reading CO2 and Pressure')
+        log = "Error while reading CO2 and Pressure"
+        logging.error(log)
         CO2_P = [0, 0]
 
     return CO2_P
@@ -279,7 +312,8 @@ def time_interval(sec):
         check.update(0x54)
         check.update(t)
         checksum = check.hexdigest()
-        logging.debug('CRC8 calculation for timestamp change is %i', checksum)
+        log = "CRC8 calculation for timestamp change is " + str(checksum)
+        logging.debug(log)
 
         write([0x71, 0x54, 0x00, t, checksum])
         # bus.write_i2c_block_data(CO2_address, 0x71, 0x54, 0x00, t, checksum)
@@ -287,16 +321,20 @@ def time_interval(sec):
         reading = read(16)
         set = (reading[0] << 8 + reading[1]) / 10
         if int(set) == sec:
-            logging.info('Measurement timestamp set successfully on %i seconds', int(set))
-            print("Measurement timestamp set successfully on ", int(set), " seconds")
+            log = "Measurement timestamp set successfully on " + str(set) + " seconds"
+            logging.info(log)
+            print(log)
             return 0
         else:
-            logging.error('Failed to set measurement timestamp to %i seconds', int(set))
-            logging.error('Timestamp remains on %i', set)
+            log = "Failed to set measurement timestamp to " + str(set) + " seconds"
+            logging.error(log)
+            log = "Timestamp remains on " + str(set)
+            logging.error(log)
             return 1
 
     except:
-        logging.error('Something went wrong with timestamp modification')
+        log = "Something went wrong with timestamp modification"
+        logging.error(log)
         return 1
 
 
@@ -324,7 +362,8 @@ def write_calibration(calibration, offset, gain, lower_limit, upper_limit):
         index = 0x04
 
     else:
-        logging.warning('The calibration command %s is unknown', calibration)
+        log = "The calibration command " + calibration + " is unknown"
+        logging.warning(log)
         pass  # don't send calibration information if calibration function is not recognized
 
     GainValue = gain * 32768
@@ -339,12 +378,18 @@ def write_calibration(calibration, offset, gain, lower_limit, upper_limit):
     write([0x71, 0x54, index, GainValue, lower_limit, upper_limit, checksum])
     # bus.write_i2c_block_data(CO2_address, 0x71, 0x54, index, GainValue, lower_limit, upper_limit, checksum)
 
+    #........... still to do some things (reading, checking...)
 
 # ---------------------------------------------------------------------
 # Test Execution
 # ---------------------------------------------------------------------
 
+log = "Launching new execution..."
+logging.info(log)
+print(log)
+
 while (True):
+
     CO2_get_RH_T()
     CO2_get_CO2_P()
     print("waiting...")
