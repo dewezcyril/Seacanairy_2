@@ -276,7 +276,7 @@ logging.info(log)
 
 while (True):
     getRHT()
-    #time.sleep(1)
+    time.sleep(1)
     getCO2P()
     print("waiting...")
     time.sleep(20)  # wait 20 seconds
