@@ -276,15 +276,15 @@ def write_calibration(calibration, offset, gain, lower_limit, upper_limit):
 # ---------------------------------------------------------------------
 # Test Execution
 # ---------------------------------------------------------------------
+if __name__ = '__main__':
+    now = datetime.now()
+    logging.info("------------------------------------")
+    log = "Launching a new execution on the " + str(now.strftime("%d/%m/%Y %H:%M:%S"))
+    logging.info(log)
 
-now = datetime.now()
-logging.info("------------------------------------")
-log = "Launching a new execution on the " + str(now.strftime("%d/%m/%Y %H:%M:%S"))
-logging.info(log)
-
-while (True):
-    getRHT()
-    time.sleep(1)
-    getCO2P()
-    print("waiting...")
-    time.sleep(20)  # wait 20 seconds
+    while (True):
+        getRHT()
+        time.sleep(1)
+        getCO2P()
+        print("waiting...")
+        time.sleep(20)  # wait 20 seconds
