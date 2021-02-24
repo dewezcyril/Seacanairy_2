@@ -19,7 +19,7 @@ import logging
 
 log_file = './log/OPC-N3.log'
 
-if __name__ = '__main__':
+if __name__ == '__main__':
     message_level = logging.DEBUG
     # If you run the code from this file directly, it will show all the DEBUG messages
 
@@ -45,16 +45,13 @@ logging.getLogger().addHandler(console)
 
 logger = logging.getLogger('OPC-N3')
 
-integration = 5
-
 # ----------------------------------------------
 # SPI config
 # ----------------------------------------------
 
 logfile = "OPC-N3"
-SPI_address_RPI = "/dev/ttyS0"          # name of the SPI of the RPI
+SPI_address_RPI = "/dev/ttyS0"  # name of the SPI of the RPI
 wait = 1e-06
-
 
 # ----------------------------------------------
 # VARIABLE
@@ -82,12 +79,13 @@ ser = serial.Serial(**serial_opts)
 power = 0x03
 histogram = 0x30
 
+
 def initiate():
     """
     Initiate the SPI communication to the OPC-N3 sensor.
     :return: nothing
     """
-    log = "Initiate the SPI communication to the OPC-N3"
+    log = "Initiate the SPI communication of the OPC-N3"
     logger.debug(log)
 
     time.sleep(1)
@@ -111,29 +109,23 @@ def initiate():
     return
 
 
-def initiate_transmission(channel = 0x03):
+def initiate_transmission(write=0x03):
     """
     First step of the OPC-N3 SPI communication
     :return: TRUE when power state has been initiated
     """
-    attempts = 0                   # Flowchart time reset
+    attempts = 0  # Flowchart time reset
 
     log = "Initiate transmission"
     logger.debug(log)
 
-    if channel == 'power':
-        write = 0x03
-
-    elif channel == 'histogram':
-        write = 0x30
-
     while True:
-        ser.write(bytearray([0x61, write]))          # Initiate control of power state
+        ser.write(bytearray([0x61, write]))  # Initiate control of power state
         reading = ser.read(2)
         # print(reading)
-        attempts += 1           # increment of attempts
+        attempts += 1  # increment of attempts
 
-        if reading == (b"\xff\xf3" or b"xf3\xff"):
+        if reading == (b'\xff\xf3' or b'xf3\xff'):
             time.sleep(wait)
             return True
 
@@ -144,7 +136,7 @@ def initiate_transmission(channel = 0x03):
             # reset SPI  connection
             # initOPC(ser)
             attempts = 0
-            break
+            return False
 
         else:
             time.sleep(wait * 10)  # wait 1e-05 before next command
@@ -152,10 +144,10 @@ def initiate_transmission(channel = 0x03):
 
 def fanOff():
     """
-    Turn OFF the fan of the OPC-N3.
+    Turn OFF the fan_status of the OPC-N3.
     :return: FALSE
     """
-    log = "Turning fan OFF"
+    log = "Turning fan_status OFF"
     logger.debug(log)
 
     if initiate_transmission():
@@ -170,10 +162,10 @@ def fanOff():
 
 def fanOn():
     """
-    Turn fan of the OPC-N3 ON.
+    Turn fan_status of the OPC-N3 ON.
     :return: TRUE
     """
-    log = "Turning fan on"
+    log = "Turning fan_status on"
     logger.debug(log)
 
     if initiate_transmission():
@@ -239,8 +231,11 @@ def combine_bytes(LSB, MSB):
 
 
 def Histdata(ans):
-    # function for all the hist data, to break up the getHist
-    # time.sleep(wait)
+    """
+    Create a dictionary of all the bytes read.
+    :param ans: chain of bytes to proceed
+    :return:Dictionary of all the possible data read
+    """
 
     data = {}
     data['Bin 0'] = combine_bytes(ans[0], ans[1])
@@ -282,7 +277,7 @@ def Histdata(ans):
 
 
 def read_all(port, chunk_size=86):
-    """Read all characters on the serial port and return them."""
+    """Read all characters on the serial port of the OPC-N3 and return them."""
     if not port.timeout:
         raise TypeError('Port needs to have a timeout set!')
 
@@ -299,10 +294,11 @@ def read_all(port, chunk_size=86):
     return read_buffer
 
 
-def rightbytes(response):
-    '''
-    Get ride of the 0x61 byeste responce from the hist data, returning just the wanted data
-    '''
+def filter_data(response):
+    """
+    Get ride of the 0x61 byte response from the hist data, returning just the wanted data
+    :return:Data cleaned of unnecessary bytes
+    """
     hist_response = []
     for j, k in enumerate(response):  # Each of the 86 bytes we expect to be returned is prefixed by 0xFF.
         if ((j + 1) % 2) == 0:  # Throw away 0th, 2nd, 4th, 6th bytes, etc.
@@ -310,18 +306,17 @@ def rightbytes(response):
     return hist_response
 
 
-def getData(ser):
+def getData():
+    """
+    Read the 86 bytes of data from the OPC-N3 sensor.
+    :return: List of 3 items
+    """
     print("Get PM data")
     T = 0
 
     while True:
         # initsiate getData commnad
-        ser.write([0x61, 0x32])
-        nl = ser.read(2)
-        #  time.sleep(1e-05)
-        T = T + 1
-        print(nl)
-        if nl == (b'\xff\xf3' or b'\xf3\xff'):
+        if initiate_transmission(0x32):
             # write to the OPC
             for i in range(14):  # Send the whole stream of bytes at once.
                 ser.write([0x61, 0x01])
@@ -330,7 +325,7 @@ def getData(ser):
             # read the data
             ans = bytearray(ser.readall())
             # print("ans=",ans)
-            ans = rightbytes(ans)
+            ans = filter_data(ans)
             # print("ans=",ans)
             b1 = ans[0:4]
             b2 = ans[4:8]
@@ -340,111 +335,68 @@ def getData(ser):
             c3 = struct.unpack('f', bytes(b3))[0]
             check = combine_bytes(ans[12], ans[13])
             print("Check=", check)
-            return ([c1, c2, c3])
-        elif T > 20:
-            print("Reset SPI")
-            time.sleep(3)  # time for spi buffer to reset
-            # reset SPI  conncetion
-            initOPC(ser)
-            T = 0
-            return
-        else:
-            time.sleep(wait * 10)  # wait 1e-05 before next commnad
+            return [c1, c2, c3]
 
 
-# get hist data
 def getHist():
+    """
+    Get Histogram data from OPC-N3.
+    :return: Dictionary containing the data
+    """
     # OPC N2 method
     T = 0  # attemt varaible
 
     while True:
-        print("get hist attempt ", T)
+        log = "get hist"
+        logger.debug(log)
 
-        ser.write([0x61, 0x30])
-        # time.sleep(wait*10)
-        nl = ser.read(2)
-        #  print(nl)
-        T = T + 1
-        print("Reading Hist data")
-        print(nl)
-        if nl == (b'\xff\xf3' or b'\xf3\xff'):
+        if initiate_transmission(0x30):
+            log = "Reading Hist data"
+            logger.debug(log)
+
             for i in range(86):  # Send the whole stream of bytes at once.
                 ser.write([0x61, 0x01])
                 time.sleep(0.000001)
 
-                # ans=bytearray(ser.read(1))
+            # ans=bytearray(ser.read(1))
             #    print("ans=",ans,"len",len(ans))
             time.sleep(wait)  # delay
             ans = bytearray(ser.readall())
             print("ans=", ans, "len", len(ans))
-            ans = rightbytes(ans)  # get the wanted data bytes
+            ans = filter_data(ans)  # get the wanted data bytes
             # ans=bytearray(test)
 
-            print("ans=", ans, "len", len(ans))
+            log = "ans = " + str(ans) + ", len = " + str(len(ans))
+            logger.info(log)
             # print("test=",test,'len',len(test))
             data = Histdata(ans)
 
             return data
-        if T > 20:
-            print("Reset SPI")
-            time.sleep(3)  # time for spi buffer to reset
-            # reset SPI  conncetion
-            initOPC(ser)
-            T = 0
 
-            return "No Data"
-        else:
-            time.sleep(wait * 10)  # wait 1e-05 before next commnad
 
-            # br.append(0x30)
-
-            # print("br",br,len(br))
-
-            # older  vertion
-        # br = bytearray([0x61])
-        #  time.sleep(wait)
-        # for i in range(0,85):
-        #    br.append(0x30)
-        # print(i,len(br),br)
-
+def getmeasurement():
+    """
+    Start the fan_status, the laser, get measurement, stop the laser and stop de fan_status.
+    :return: Measurements
+    """
+    initiate()
+    time.sleep(1)
+    fanOn()
+    time.sleep(5)
+    LaserOn()
+    for x in range(0, 1):
+        print(getData())
+        time.sleep(1)
+        print(getHist())
+        time.sleep(5)
+    fanOff()
+    time.sleep(.1)
+    LaserOff()
+    time.sleep(.1)
+    ser.close()
+    return
 
 if __name__ == "__main__":
-
-
-    # ser.open()
-
-    print("**************************************************")
-    print("DID YOU CHECK THE DATE/TIME ????????")
-    print("**************************************************")
-    print("integration time (seconds)", integration)
-    print("**************************************************")
-    print("Init:")
-    initOPC(ser)
-    time.sleep(1)
-    print("Fan & Lazer Off:")
-    fan = fanOff(ser)
-    time.sleep(.1)
-    laz = LaserOff(ser)
-    time.sleep(5)
-    print("Fan & Lazer on:")
-    fan = fanOn(ser)
-    time.sleep(5)
-    LaserOn(ser)
-    # time.sleep(5)
-    # PM data#
-    for x in range(0, 1):
-        #   print(getData(ser))
-
-        print(getData(ser))
-        time.sleep(1)
-        print(getHist(ser))
-        time.sleep(integration)
-    print("Turning off")
-    time.sleep(2)
-
-    LaserOff(ser)
-    time.sleep(wait)
-    fanOff(ser)
-
-    time.sleep(5)
-    ser.close()
+    while True:
+        getmeasurement()
+        time.sleep(5)
