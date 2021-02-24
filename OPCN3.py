@@ -19,15 +19,23 @@ import logging
 
 log_file = './log/OPC-N3.log'
 
+if __name__ = '__main__':
+    message_level = logging.DEBUG
+    # If you run the code from this file directly, it will show all the DEBUG messages
+
+else:
+    message_level = logging.INFO
+    # If you run this code from another file (using this one as a library), it will only print INFO messages
+
 # set up logging to file - see previous section for more details
-logging.basicConfig(level=logging.INFO,
+logging.basicConfig(level=message_level,
                     format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
                     datefmt='%m-%d %H:%M',
                     filename=log_file,
                     filemode='a')
 # define a Handler which writes INFO messages or higher to the sys.stderr/display
 console = logging.StreamHandler()
-console.setLevel(logging.DEBUG)
+console.setLevel(message_level)
 # set a format which is simpler for console use
 formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
 # tell the handler to use this format
@@ -71,13 +79,17 @@ serial_opts = {
 
 ser = serial.Serial(**serial_opts)
 
+power = 0x03
+histogram = 0x30
+
 def initiate():
     """
     Initiate the SPI communication to the OPC-N3 sensor.
     :return: nothing
     """
     log = "Initiate the SPI communication to the OPC-N3"
-    logger.info(log)
+    logger.debug(log)
+
     time.sleep(1)
 
     ser.write(bytearray([0x5A, 0x01]))
@@ -99,15 +111,24 @@ def initiate():
     return
 
 
-def initiate_control_of_power_state():
+def initiate_transmission(channel = 0x03):
     """
     First step of the OPC-N3 SPI communication
     :return: TRUE when power state has been initiated
     """
     attempts = 0                   # Flowchart time reset
 
+    log = "Initiate transmission"
+    logger.debug(log)
+
+    if channel == 'power':
+        write = 0x03
+
+    elif channel == 'histogram':
+        write = 0x30
+
     while True:
-        ser.write(bytearray([0x61, 0x03]))          # Initiate control of power state
+        ser.write(bytearray([0x61, write]))          # Initiate control of power state
         reading = ser.read(2)
         # print(reading)
         attempts += 1           # increment of attempts
@@ -117,7 +138,7 @@ def initiate_control_of_power_state():
             return True
 
         elif attempts > 20:
-            log = "Failed to initiate power control."
+            log = "Failed to initiate power control. Wiring may not be correct."
             logger.error(log)
             time.sleep(3)  # time for spi buffer to reset
             # reset SPI  connection
@@ -134,9 +155,10 @@ def fanOff():
     Turn OFF the fan of the OPC-N3.
     :return: FALSE
     """
-    print("Turning fan OFF")
+    log = "Turning fan OFF"
+    logger.debug(log)
 
-    if initiate_control_of_power_state():
+    if initiate_transmission():
         ser.write(bytearray([0x61, 0x02]))
         reading = ser.read(2)
         #      print(reading)
@@ -151,9 +173,10 @@ def fanOn():
     Turn fan of the OPC-N3 ON.
     :return: TRUE
     """
-    print("Turning fan on")
+    log = "Turning fan on"
+    logger.debug(log)
 
-    if initiate_control_of_power_state():
+    if initiate_transmission():
         ser.write(bytearray([0x61, 0x03]))
         nl = ser.read(2)
         #        print(nl)
@@ -168,9 +191,10 @@ def LaserOn():
     Turn the laser of the OPC-N3 ON.
     :return: TRUE
     """
-    print("Turning laser ON")
+    log = "Turning laser ON"
+    logger.debug(log)
 
-    if initiate_control_of_power_state():
+    if initiate_transmission():
         # Lazer on
         ser.write(bytearray([0x61, 0x07]))
         nl = ser.read(2)
@@ -188,7 +212,7 @@ def LaserOff():
     """
     print("Laser Off")
 
-    if initiate_control_of_power_state():
+    if initiate_transmission():
         ser.write(bytearray([0x61, 0x06]))
         nl = ser.read(2)
         #            print(nl)
@@ -329,13 +353,13 @@ def getData(ser):
 
 
 # get hist data
-def getHist(ser):
+def getHist():
     # OPC N2 method
     T = 0  # attemt varaible
+
     while True:
         print("get hist attempt ", T)
 
-        # reques the hist data set
         ser.write([0x61, 0x30])
         # time.sleep(wait*10)
         nl = ser.read(2)
