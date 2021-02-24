@@ -32,17 +32,25 @@ check = crc8.crc8()
 # --------------------------------------------------------
 import logging
 
+if __name__ = '__main__':
+    message_level = logging.DEBUG
+    # If you run the code from this file directly, it will show all the DEBUG messages
+
+else:
+    message_level = logging.INFO
+    # If you run this code from another file (using this one as a library), it will only print INFO messages
+
 log_file = './log/CO2.log'
 
 # set up logging to file - see previous section for more details
-logging.basicConfig(level=logging.INFO,
+logging.basicConfig(level=message_level,
                     format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
                     datefmt='%m-%d %H:%M',
                     filename=log_file,
                     filemode='a')
 # define a Handler which writes INFO messages or higher to the sys.stderr/display
 console = logging.StreamHandler()
-console.setLevel(logging.DEBUG)
+console.setLevel(message_level)
 # set a format which is simpler for console use
 formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
 # tell the handler to use this format
