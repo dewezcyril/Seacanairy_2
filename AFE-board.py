@@ -1,14 +1,16 @@
-#get the time
-from datetime import date
 from datetime import datetime
 import time
+
+
+
 
 #get the locations of the input on the rpi and ADC
 # import smbus
 import sys
 import subprocess
-
-#ports location
+# --------------------------------------------------
+# I2C
+# --------------------------------------------------
 from smbus2 import SMBus
 from sys import exit
 
@@ -18,12 +20,43 @@ bus = SMBus(1)
 #attributed canals and associated emplacements variable
 address = 0b1110110
 
-#logging
+# --------------------------------------------------
 # logging
+# --------------------------------------------------
 import logging
-log_file = './log/4AFE_board.log'
-logging.basicConfig(filename=log_file, level=logging.DEBUG, format='%(asctime)s %(levelname)s %(name)s %(message)s')
-logger=logging.getLogger(__name__)
+
+if __name__ == "__main__":
+    message_level = logging.DEBUG
+    log_file = './log/AFE-board-test.log'
+    # If you run the code from this file directly, it will show all the DEBUG messages
+
+else:
+    message_level = logging.INFO
+    log_file = './log/AFE-board.log'
+    # If you run this code from another file (using this one as a library), it will only print INFO messages
+
+
+# set up logging to file - see previous section for more details
+logging.basicConfig(level=message_level,
+                    format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
+                    datefmt='%m-%d %H:%M',
+                    filename=log_file,
+                    filemode='a')
+# define a Handler which writes INFO messages or higher to the sys.stderr/display
+console = logging.StreamHandler()
+console.setLevel(message_level)
+# set a format which is simpler for console use
+formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
+# tell the handler to use this format
+console.setFormatter(formatter)
+# add the handler to the root logger
+logging.getLogger().addHandler(console)
+
+logger = logging.getLogger('CO2 sensor')
+
+# --------------------------------------------------
+# ADC channels
+# --------------------------------------------------
 
 # Channel Address - Single channel use
 # See LTC2497 data sheet, Table 3, Channel Selection.
@@ -86,9 +119,10 @@ def getADCreading(adc_address,adc_channel):
 
 
     if( (reading[0]& 0b11000000) == 0b11000000):
-        logging.warning("Input voltage to channel 0x%x is either open or more than %5.2f. "
-               "The reading may not be correct. Value read in is %12.8f Volts." % ((adc_channel), vref, volts))
-
+        log = "Input voltage to channel " + str(adc_channel) + " is either open or more than " + str(vref) + "Volts"
+        logging.warning(log)
+        log = "The reading may not be correct. Value read is " + str(volts) + " Volts"
+        logging.warning(log)
 
     return volts
 #====================================================================================
@@ -97,19 +131,11 @@ time.sleep(sleep)
 
 ch0_mult = 1000 #multiplication of the value given by the rpi
 
-now = datetime.now()
-
-def ADC_reading():
-    AFE_temp()
-    AFE_NO2()
-    AFE_Ox()
-    AFE_SO2()
-    AFE_CO()
-
 
 def AFE_temp():
     """
     Measure temperature from the Alphasense 4-AFE Board via ADC
+    Note that the sensor is not located in the gas hood.
     :return: Temperature (volts)
     """
     tempv = ch0_mult * getADCreading(address,channel0)
