@@ -124,15 +124,17 @@ def getADCreading(adc_address,adc_channel):
         log = "The reading may not be correct. Value read is " + str(volts) + " Volts"
         logging.warning(log)
 
+    time.sleep(sleep)       # be sure to have some time laps between two I2C reading/writing
+
     return volts
 #====================================================================================
 
-time.sleep(sleep)
+
 
 ch0_mult = 1000 #multiplication of the value given by the rpi
 
 
-def AFE_temp():
+def temp():
     """
     Measure temperature from the Alphasense 4-AFE Board via ADC
     Note that the sensor is not located in the gas hood.
@@ -143,7 +145,7 @@ def AFE_temp():
     time.sleep(sleep)
     return tempv
 
-def AFE_NO2():
+def NO2():
     """
     Measure NO2 from the Alphasense 4-AFE Board via ADC
     :return: List[NO2 main (volts), NO2 auxiliary (volts)]
@@ -157,7 +159,7 @@ def AFE_NO2():
     return [NO2v_main, NO2v_aux]
 
 
-def AFE_Ox():
+def OX():
     """
     Measure Ox from the Alphasense 4-AFE Board via ADC
     :return: List[Ox main (Volts), Ox Auxiliary (Volts)]
@@ -171,7 +173,7 @@ def AFE_Ox():
     return [Oxv_main, Oxv_aux]
 
 
-def AFE_SO2():
+def SO2():
     """
     Measure SO2 from the Alphasense 4-AFE Board via ADC
     :return:
@@ -185,7 +187,7 @@ def AFE_SO2():
     return [SO2v_main, SO2v_aux]
 
 
-def AFE_CO():
+def CO():
     """
     Measure CO from the Alphasense 4-AFE Board via ADC
     :return:
@@ -200,14 +202,14 @@ def AFE_CO():
 
 
 # open the file where the data will be stored
-while (True):
-#    f = open("Tshirp.rtf", "a")
-    ADC_reading()
-
-    time.sleep(sleep)
-
-#    sys.stdout.flush() #on exit or at interruption, without this, the data could be lost
-
-    time.sleep(zeit)
+if __name__ == "__main__":
+    # Execute an execution test if the script is executed from there
+    while(True):
+        temp()
+        NO2()
+        OX()
+        SO2()
+        CO()
+        time.sleep(10)
 
 
