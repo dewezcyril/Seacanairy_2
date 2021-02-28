@@ -5,7 +5,7 @@ Inspired and adapted from the library of JarvisSan22 available on Github: https:
 Submitted to LICENCE due to the Git Clone
 """
 
-import serial
+from serial import Serial
 import time
 import struct
 import datetime
@@ -50,31 +50,27 @@ logger = logging.getLogger('OPC-N3')
 # ----------------------------------------------
 
 logfile = "OPC-N3"
-SPI_address_RPI = "/dev/ttyS0"  # name of the SPI of the RPI
+SPI_address_RPI = "/dev/ttyAMA0"  # name of the SPI of the RPI
 wait = 1e-06
 
 # ----------------------------------------------
 # VARIABLE
 # ----------------------------------------------
 
-serial_opts = {
-    # built-in serial port is "COM1"
-    # USB serial port is "COM4"
-    "port": SPI_address_RPI,
-    "baudrate": 9600,
-    "parity": serial.PARITY_NONE,
-    "bytesize": serial.EIGHTBITS,
-    "stopbits": serial.STOPBITS_ONE,
-    "xonxoff": False,
-    "timeout": wait,
-    # "inter_byte_timeout":wait,# Alternative
-    # "write_timeout":wait,
-}
 
-# wait for opc to boot
-# time.sleep(10)
 
-ser = serial.Serial(**serial_opts)
+
+ser = Serial(
+    port = SPI_address_RPI,
+    baudrate = 960,
+    parity = 'N',
+    stopbits = 1,
+    bytesize = 8,
+    xonxoff = False,
+    timeout = wait
+)
+
+print("Serial port used is: ", ser.name)
 
 power = 0x03
 histogram = 0x30
@@ -85,25 +81,35 @@ def initiate():
     Initiate the SPI communication to the OPC-N3 sensor.
     :return: nothing
     """
+
+
     log = "Initiate the SPI communication of the OPC-N3"
     logger.debug(log)
 
     time.sleep(1)
-
+    log = "Sending bytes to the sensor..."
+    logger.debug(log)
     ser.write(bytearray([0x5A, 0x01]))
     reading = ser.read(3)
-    print(reading)
+    log = "Data read after sending bytes are: " + str(reading)
+    logger.debug(log)
     time.sleep(wait)
 
+    log = "Sending bytes to the sensor..."
+    logger.debug(log)
     ser.write(bytearray([0x5A, 0x03]))
     reading = ser.read(9)
-    print(reading)
+    log = "Bytes read after sending bytes are: " + str(reading)
+    logger.debug(log)
     time.sleep(wait)
 
     # SPI conncetion
+    log = "Sending bytes to the sensor..."
+    logger.debug(log)
     ser.write(bytearray([0x5A, 0x02, 0x92, 0x07]))
     reading = ser.read(2)
-    print(reading)
+    log = "Bytes read after sending bytes are: " + str(reading)
+    logger.debug(log)
     time.sleep(wait)
 
     return
@@ -120,12 +126,17 @@ def initiate_transmission(write=0x03):
     logger.debug(log)
 
     while True:
+        log = "Sending " + str(write) + " bytes"
+        logger.debug(log)
         ser.write(bytearray([0x61, write]))  # Initiate control of power state
         reading = ser.read(2)
+        log = "Reading is: " + str(reading)
         # print(reading)
         attempts += 1  # increment of attempts
 
         if reading == (b'\xff\xf3' or b'xf3\xff'):
+            log = "Acknowledge byte received"
+            logger.debug(log)
             time.sleep(wait)
             return True
 
@@ -140,6 +151,8 @@ def initiate_transmission(write=0x03):
 
         else:
             time.sleep(wait * 10)  # wait 1e-05 before next command
+            log = "Wait before initiating new attempt"
+            logger.debug(log)
 
 
 def fanOff():
