@@ -32,7 +32,7 @@ check = crc8.crc8()
 # --------------------------------------------------------
 import logging
 
-if __name__ = '__main__':
+if __name__ == "__main__":
     message_level = logging.DEBUG
     # If you run the code from this file directly, it will show all the DEBUG messages
 
