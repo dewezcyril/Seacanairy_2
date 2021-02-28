@@ -45,7 +45,7 @@ def initOPC(ser):
     time.sleep(wait)
 
 
-# Turn fan
+# Turn fan_status
 
 def fanOff(ser):
     print("Fan turn off")
@@ -60,7 +60,7 @@ def fanOff(ser):
         T = T + 1
         if nl == (b"\xff\xf3" or b"xf3\xff"):
             time.sleep(wait)
-            # fan off
+            # fan_status off
             ser.write(bytearray([0x61, 0x02]))
             nl = ser.read(2)
             #      print(nl)
@@ -79,7 +79,7 @@ def fanOff(ser):
             time.sleep(wait * 10)  # wait 1e-05 before next commnad
 
 
-# Turn fan and laser on
+# Turn fan_status and laser on
 def fanOn(self, ser):
     print("Fan turn on")
     # start the flow chart the flow chart
@@ -91,7 +91,7 @@ def fanOn(self, ser):
         T = T + 1
         if nl == (b"\xff\xf3" or b"xf3\xff"):
             time.sleep(wait)
-            # fan on
+            # fan_status on
             ser.write(bytearray([0x61, 0x03]))
             nl = ser.read(2)
             #        print(nl)
@@ -292,7 +292,7 @@ def getData(self, ser):
             # read the data
             ans = bytearray(ser.readall())
             # print("ans=",ans)
-            ans = self.rightbytes(ans)
+            ans = self.filter_data(ans)
             # print("ans=",ans)
             b1 = ans[0:4]
             b2 = ans[4:8]
@@ -339,7 +339,7 @@ def getHist(self, ser):
             time.sleep(wait)  # delay
             ans = bytearray(ser.readall())
             #     print("ans=",ans,"len",len(ans))
-            ans = self.rightbytes(ans)  # get the wanted data bytes
+            ans = self.filter_data(ans)  # get the wanted data bytes
             # ans=bytearray(test)
             #    print("ans=",ans,"len",len(ans))
             # print("test=",test,'len',len(test))
