@@ -1,0 +1,18 @@
+#define CRC8_ONEWIRE_POLY 0x31
+#define CRC8_ONEWIRE_START 0xff
+
+static unsigned char i2cCalcCRC8 (unsigned char buf[], unsigned char from, unsigned char to) {
+    unsigned char crcVal = CRC8_ONEWIRE_START;
+    unsigned char i = 0;
+    unsigned char j = 0;
+    unsigned char curval = 0;
+
+    for (i = from; i < to; i ++){
+        int curVal = buf[i]; for (j = 0; j < 8; j ++) {
+            if (((crcVal ^ curVal) & 0x80) != 0) // If MSBs are not equal {
+                crcVal = ((crcVal << 1) ^ CRC8_ONEWIRE_POLY); }
+            else {
+                crcVal = (crcVal << 1);}
+            curVal = curVal << 1; }
+         }
+    return crcVal; }
