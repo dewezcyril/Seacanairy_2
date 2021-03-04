@@ -1,5 +1,10 @@
+"""
+Translation from C++ to Python of the CRC8 example from TUG_EE894_I2C.pdf page 7 and 8
+"""
+
 POLY = 0x31
 START = 0xFF
+
 
 def calc_CRC8(buf):
     crcVal = START
@@ -19,5 +24,6 @@ def calc_CRC8(buf):
 
     return crcVal
 
-answer = hex(calc_CRC8([0x00, 0xC8]))
-print(answer)
+
+answer = calc_CRC8([0x00, 0xC8])
+print("CRC8 calculation is: ", hex(answer))
