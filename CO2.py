@@ -63,6 +63,52 @@ logger = logging.getLogger('CO2 sensor')
 
 # --------------------------------------------------------
 
+class CRC8:
+    """
+    CRC8 Checksum for the CO2 sensor
+    Width: 8 bit
+    Polynomial: 0x31
+    XOR input: 0xFF
+    Reflect input: False
+    Reflect output: False
+    XOR output: 0x00
+    """
+
+    def digest(self, data):
+        """
+        Digest the data to return the corresponding checksum
+        :param data: List of data to digest
+        :return: checksum
+        """
+        crcVal = 0xff
+        _from = 0  # the first item in a list is named 0
+        _to = len(buf)  # if there are two items in the list, then len() return 1 --> range(0, 1) = 2 loops
+
+        for i in range(_from, _to):
+            curVal = buf[i]
+
+            for j in range(0, 8):  # C++ stops when J is not < 8 --> same for python in range
+                if ((crcVal ^ curVal) & 0x80) != 0:
+                    crcVal = (crcVal << 1) ^ 0x31
+
+                else:
+                    crcVal = (crcVal << 1)
+
+                curVal = (curVal << 1)  # this line is in the "for j" loop, not in the "for i" loop
+
+        checksum = crcVal & 0xff  # keep only the 8 last bits
+
+        return checksum
+
+    def check(self, data, checksum):
+        """
+        Check that the data transmitted are correct using the data and the checksum
+        :param data: List containing the data to be digested (see sensor doc)
+        :param checksum: Checksum given by the sensor
+        :return:
+        """
+        CRC8.digest(data)
+
 
 def CO2_request_measurement():
     """
@@ -106,21 +152,21 @@ def getRHT():
     write = i2c_msg.write(CO2_address, [0xE0, 0x00])
     read = i2c_msg.read(CO2_address, 6)
 
-    attempts = 0                # reset trial counter
+    attempts = 0  # reset trial counter
 
     while attempts < 3:
         try:
             with SMBus(1) as bus:
                 bus.i2c_rdwr(write, read)
-            break               # break the loop if the try has not failed at the previous line
+            break  # break the loop if the try has not failed at the previous line
 
         except:
             log = "Error while reading RH and Temperature from CO2 sensor " + str(attempts) + "/3"
             logger.critical(log)
-            time.sleep(1)       # if I²C comm fails, wait a little bit before the next reading (this is a general
-                                # recommendation concerning I²C comm)
-            attempts += 1       # increment of attempts
-            pass                # doesn't worth to make further calculations if I²C process fails
+            time.sleep(1)  # if I²C comm fails, wait a little bit before the next reading (this is a general
+            # recommendation concerning I²C comm)
+            attempts += 1  # increment of attempts
+            pass  # doesn't worth to make further calculations if I²C process fails
 
     reading = list(read)
     # reading << 8 = shift bytes 8 times to the left, equally, add 8 times 0 on the right
@@ -152,21 +198,21 @@ def getCO2P():
     write = i2c_msg.write(CO2_address, [0xE0, 0x27])
     read = i2c_msg.read(CO2_address, 9)
 
-    attempts = 0                # reset trial counter
+    attempts = 0  # reset trial counter
 
     while attempts < 3:
         try:
             with SMBus(1) as bus:
                 bus.i2c_rdwr(write, read)
-            break               # break the loop if the try has not failed at the previous line
+            break  # break the loop if the try has not failed at the previous line
 
         except:
             log = "Error while reading CO2 and Pressure from CO2 sensor via I²C " + str(attempts) + "/3"
             logger.critical(log)
-            time.sleep(1)       # if I²C comm fails, wait a little bit before the next reading (this is a general
-                                # recommendation concerning I²C comm)
-            attempts += 1       # increment of attempts
-            pass                # doesn't worth to make further calculations if I²C process fails
+            time.sleep(1)  # if I²C comm fails, wait a little bit before the next reading (this is a general
+            # recommendation concerning I²C comm)
+            attempts += 1  # increment of attempts
+            pass  # doesn't worth to make further calculations if I²C process fails
 
     reading = list(read)
 
@@ -175,7 +221,7 @@ def getCO2P():
     logger.info(log)
 
     CO2_raw = (reading[3] << 8) + reading[4]
-    log = "CO2 instant is: "+ str(CO2_raw) + " ppm"
+    log = "CO2 instant is: " + str(CO2_raw) + " ppm"
     logger.info(log)
 
     # reading << 8 = shift bytes 8 times to the left, equally, add 8 times 0 on the right
@@ -192,7 +238,7 @@ def getCO2P():
 # Settings
 # ---------------------------------------------------------------------
 
-def time_interval(seconds):
+def set_time_interval(seconds):
     """
     Def measurement timestamp for CO2 sensor
     :param seconds: seconds
@@ -201,15 +247,11 @@ def time_interval(seconds):
     try:
         t = hex(seconds * 10)
 
-        check.update(0x71)
-        check.update(0x54)
-        check.update(t)
-        checksum = check.hexdigest()
         log = "CRC8 calculation for timestamp change is " + str(checksum)
         logger.debug(log)
 
-        write([0x71, 0x54, 0x00, t, checksum])
-        # bus.write_i2c_block_data(CO2_address, 0x71, 0x54, 0x00, t, checksum)
+        write = i2c_msg.write(CO2_address, [0x71, 0x54, 0x00, t, checksum])
+
         sleep()
         reading = read(16)
         set = (reading[0] << 8 + reading[1]) / 10
