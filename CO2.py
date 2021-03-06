@@ -161,19 +161,18 @@ def getRHT():
                 break  # break the loop if the try has not failed at the previous line
 
             except:
-                log = "Error in the i2c transmission. Trying again... (" + str(reading_trials) + "/3)"
+                if reading_trials == 3:
+                    log = "RH and temperature lecture from CO2 sensor aborted. i2c transmission problem."
+                    logger.critical(log)
+                    return [-1, -1]
+                reading_trials += 1  # increment of reading_trials
+                log = "Error in the i2c transmission. Trying again..."
                 logger.error(log)
                 time.sleep(1)  # if I²C comm fails, wait a little bit before the next reading (this is a general
                 # recommendation concerning I²C comm)
-                reading_trials += 1  # increment of reading_trials
 
-            if reading_trials == 3:
-                log = "RH and temperature lecture from CO2 sensor aborted. i2c transmission problem."
-                logger.critical(log)
-                return [-1, -1]
 
         reading = list(read)
-        print(reading)
         if check(reading[2], [reading[0], reading[1]]) and check(reading[5], [reading[3], reading[4]]):
             # reading << 8 = shift bytes 8 times to the left, equally, add 8 times 0 on the right
             temperature = round(((reading[0] << 8) + reading[1]) / 100 - 273.15, 2)
@@ -227,16 +226,16 @@ def getCO2P():
                 break  # break the loop if the try has not failed at the previous line
 
             except:
-                log = "Error in the i2c transmission. Trying again... (" + str(reading_trials) + "/3)"
+                if reading_trials == 3:
+                    log = "RH and temperature lecture from CO2 sensor aborted. i2c transmission problem."
+                    logger.critical(log)
+                    return [-1, -1, -1]  # indicate that the data are wrong
+                log = "Error in the i2c transmission. Trying again..."
                 logger.error(log)
                 time.sleep(1)  # if I²C comm fails, wait a little bit before the next reading (this is a general
                 # recommendation concerning I²C comm)
                 reading_trials += 1  # increment of reading_trials
 
-            if reading_trials == 3:
-                log = "RH and temperature lecture from CO2 sensor aborted. i2c transmission problem."
-                logger.critical(log)
-                return [-1, -1, -1] # indicate that the data are wrong
 
         reading = list(read)
         if check(reading[2], [reading[0], reading[1]]) and check(reading[5], [reading[3], reading[4]]) and check(reading[8], [reading[6], reading[7]]):
