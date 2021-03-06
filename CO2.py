@@ -74,12 +74,13 @@ class CRC8:
     XOR output: 0x00
     """
 
-    def digest(self, data):
+    def digest(self, *data):
         """
         Digest the data to return the corresponding checksum
-        :param data: List of data to digest
+        :param buf: List of data to digest
         :return: checksum
         """
+        buf = list(data)
         crcVal = 0xff
         _from = 0  # the first item in a list is named 0
         _to = len(buf)  # if there are two items in the list, then len() return 1 --> range(0, 1) = 2 loops
@@ -100,17 +101,23 @@ class CRC8:
 
         return checksum
 
-    def check(self, data, checksum):
+    def check(self, checksum, *data):
         """
         Check that the data transmitted are correct using the data and the checksum
         :param data: List containing the data to be digested (see sensor doc)
         :param checksum: Checksum given by the sensor
         :return:
         """
-        CRC8.digest(data)
+        calculation = CRC8.digest(self, data)
+        if calculation == checksum:
+            return True
+        else:
+            log = "CRC8 does not fit. Data are wrong"
+            logging.debug(log)
+            return False
 
 
-def CO2_request_measurement():
+def request_measurement():
     """
     Request a new measurement to the sensor if the previous one is older than 10 seconds.
 
@@ -152,35 +159,55 @@ def getRHT():
     write = i2c_msg.write(CO2_address, [0xE0, 0x00])
     read = i2c_msg.read(CO2_address, 6)
 
-    attempts = 0  # reset trial counter
+    attempts = 0 # reset trial counter
+    reading_trials = 0 # reset trial counter
 
-    while attempts < 3:
-        try:
-            with SMBus(1) as bus:
-                bus.i2c_rdwr(write, read)
-            break  # break the loop if the try has not failed at the previous line
+    while attempts < 4:
 
-        except:
-            log = "Error while reading RH and Temperature from CO2 sensor " + str(attempts) + "/3"
-            logger.critical(log)
-            time.sleep(1)  # if I²C comm fails, wait a little bit before the next reading (this is a general
-            # recommendation concerning I²C comm)
-            attempts += 1  # increment of attempts
-            pass  # doesn't worth to make further calculations if I²C process fails
+        while reading_trials < 4:
+            try:
+                with SMBus(1) as bus:
+                    bus.i2c_rdwr(write, read)
+                break  # break the loop if the try has not failed at the previous line
 
-    reading = list(read)
-    # reading << 8 = shift bytes 8 times to the left, equally, add 8 times 0 on the right
-    temperature = round(((reading[0] << 8) + reading[1]) / 100 - 273.15, 2)
-    relative_humidity = ((reading[3] << 8) + reading[4]) / 100
+            except:
+                log = "Error in the i2c transmission. Trying again... (" + str(reading_trials) + "/3)"
+                logger.error(log)
+                time.sleep(1)  # if I²C comm fails, wait a little bit before the next reading (this is a general
+                # recommendation concerning I²C comm)
+                reading_trials += 1  # increment of reading_trials
 
-    log = "Temperature from CO2 sensor is: " + str(temperature) + " °C"
-    logger.info(log)
-    log = "Relative humidity is: " + str(relative_humidity) + " %RH"
-    logger.info(log)
+            if reading_trials = 3:
+                log = "RH and temperature lecture from CO2 sensor aborted. i2c transmission problem."
+                logger.critical(log)
+                return [-1, -1]
 
-    RH_T = [relative_humidity, temperature]  # create a chain of values to be returned by the function
+        reading = list(read)
+        if CRC8.check(reading[2], reading[0], reading[1])\
+                and CRC8.check(reading[5], reading[3], reading[4]):
+            # reading << 8 = shift bytes 8 times to the left, equally, add 8 times 0 on the right
+            temperature = round(((reading[0] << 8) + reading[1]) / 100 - 273.15, 2)
+            relative_humidity = ((reading[3] << 8) + reading[4]) / 100
 
-    return RH_T
+            print("Temperature from CO2 sensor is:", temperature, "°C")
+            print("Relative humidity from CO2 sensor is:", relative_humidity, "%RH")
+
+            RH_T = [relative_humidity, temperature]  # create a chain of values to be returned by the function
+
+            return RH_T
+
+        else:
+            attempts += 1
+            if attempts = 3:
+                log = "Error in the data received. Temperature and humidity reading aborted"
+                logger.error(log)
+                return [-1, -1]  # indicate that the data are wrong
+            else:
+                log = "Error in the data received. Reading data again... (" + str(attempts) + "/3)"
+                logger.error(log)
+
+        if attempts = 3:
+            return [-1, -1] # indicate that the data are wrong
 
 
 def getCO2P():
@@ -198,40 +225,56 @@ def getCO2P():
     write = i2c_msg.write(CO2_address, [0xE0, 0x27])
     read = i2c_msg.read(CO2_address, 9)
 
-    attempts = 0  # reset trial counter
+    attempts = 0 # reset trial counter
+    reading_trials = 0  # reset trial counter
 
-    while attempts < 3:
-        try:
-            with SMBus(1) as bus:
-                bus.i2c_rdwr(write, read)
-            break  # break the loop if the try has not failed at the previous line
+    while attempts < 4:
 
-        except:
-            log = "Error while reading CO2 and Pressure from CO2 sensor via I²C " + str(attempts) + "/3"
-            logger.critical(log)
-            time.sleep(1)  # if I²C comm fails, wait a little bit before the next reading (this is a general
-            # recommendation concerning I²C comm)
-            attempts += 1  # increment of attempts
-            pass  # doesn't worth to make further calculations if I²C process fails
+        while reading_trials < 4:
+            try:
+                with SMBus(1) as bus:
+                    bus.i2c_rdwr(write, read)
+                break  # break the loop if the try has not failed at the previous line
 
-    reading = list(read)
+            except:
+                log = "Error in the i2c transmission. Trying again... (" + str(reading_trials) + "/3)"
+                logger.error(log)
+                time.sleep(1)  # if I²C comm fails, wait a little bit before the next reading (this is a general
+                # recommendation concerning I²C comm)
+                reading_trials += 1  # increment of reading_trials
 
-    CO2_average = (reading[0] << 8) + reading[1]
-    log = "CO2 average is: " + str(CO2_average) + " ppm"
-    logger.info(log)
+            if reading_trials = 3:
+                log = "RH and temperature lecture from CO2 sensor aborted. i2c transmission problem."
+                logger.critical(log)
+                return [-1, -1, -1] # indicate that the data are wrong
 
-    CO2_raw = (reading[3] << 8) + reading[4]
-    log = "CO2 instant is: " + str(CO2_raw) + " ppm"
-    logger.info(log)
+        reading = list(read)
+        if CRC8.check(reading[2], reading[0], reading[1])\
+                and CRC8.check(reading[5], reading[3], reading[4])\
+                and CRC8.check(reading[8], reading[6], reading[7]):
+            CO2_average = (reading[0] << 8) + reading[1]
+            print ("CO2 average is:", -CO2_average, "ppm")
 
-    # reading << 8 = shift bytes 8 times to the left, equally, add 8 times 0 on the right
-    pressure = (((reading[6]) << 8) + reading[7]) / 10
-    log = "Pressure is: " + str(pressure) + " mbar"
-    logger.info(log)
+            CO2_raw = (reading[3] << 8) + reading[4]
+            print("CO2 instant is:", CO2_raw, "ppm")
 
-    CO2_P = [CO2_average, CO2_raw, pressure]  # create a chain of values to be returned by the function
+            # reading << 8 = shift bytes 8 times to the left, equally, add 8 times 0 on the right
+            pressure = (((reading[6]) << 8) + reading[7]) / 10
+            print("Pressure is:",  pressure, "mbar")
 
-    return CO2_P
+            CO2_P = [CO2_average, CO2_raw, pressure]  # create a chain of values to be returned by the function
+
+            return CO2_P
+
+        else:
+            attempts += 1
+            if attempts = 3:
+                log = "Error in the data received. CO2 and pressure reading aborted"
+                logger.error(log)
+                return [-1, -1, -1]  # indicate that the data are wrong
+            else:
+                log = "Error in the data received. Reading data again... (" + str(attempts) + "/3)"
+                logger.error(log)
 
 
 # ---------------------------------------------------------------------
@@ -244,32 +287,34 @@ def set_time_interval(seconds):
     :param seconds: seconds
     :return: 0 for success, 1 for error
     """
-    try:
-        t = hex(seconds * 10)
+    t = hex(seconds * 10)
+    while attempts < 3:
+        try:
 
-        log = "CRC8 calculation for timestamp change is " + str(checksum)
-        logger.debug(log)
+            CRC8.digest()
+            log = "CRC8 calculation for timestamp change is " + str(checksum)
+            logger.debug(log)
 
-        write = i2c_msg.write(CO2_address, [0x71, 0x54, 0x00, t, checksum])
+            write = i2c_msg.write(CO2_address, [0x71, 0x54, 0x00, t, checksum])
 
-        sleep()
-        reading = read(16)
-        set = (reading[0] << 8 + reading[1]) / 10
-        if int(set) == seconds:
-            log = "Measurement timestamp set successfully on " + str(set) + " seconds"
-            logger.info(log)
-            return 0
-        else:
-            log = "Failed to set measurement timestamp to " + str(set) + " seconds"
-            logger.error(log)
-            log = "Timestamp remains on " + str(set)
+            sleep()
+            reading = read(16)
+            set = (reading[0] << 8 + reading[1]) / 10
+            if int(set) == seconds:
+                log = "Measurement timestamp set successfully on " + str(set) + " seconds"
+                logger.info(log)
+                return 0
+            else:
+                log = "Failed to set measurement timestamp to " + str(set) + " seconds"
+                logger.error(log)
+                log = "Timestamp remains on " + str(set)
+                logger.error(log)
+                return 1
+
+        except:
+            log = "Something went wrong with timestamp modification..."
             logger.error(log)
             return 1
-
-    except:
-        log = "Something went wrong with timestamp modification"
-        logger.error(log)
-        return 1
 
 
 def write_calibration(calibration, offset, gain, lower_limit, upper_limit):
