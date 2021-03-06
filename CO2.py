@@ -63,58 +63,48 @@ logger = logging.getLogger('CO2 sensor')
 
 # --------------------------------------------------------
 
-class CRC8:
+def digest(buf):
     """
-    CRC8 Checksum for the CO2 sensor
-    Width: 8 bit
-    Polynomial: 0x31
-    XOR input: 0xFF
-    Reflect input: False
-    Reflect output: False
-    XOR output: 0x00
+    Digest the data to return the corresponding checksum
+    :param data: List of data to digest
+    :return: checksum
     """
+    crcVal = 0xff
+    _from = 0  # the first item in a list is named 0
+    _to = len(buf)  # if there are two items in the list, then len() return 1 --> range(0, 1) = 2 loops
 
-    def digest(self, *data):
-        """
-        Digest the data to return the corresponding checksum
-        :param buf: List of data to digest
-        :return: checksum
-        """
-        buf = list(data)
-        crcVal = 0xff
-        _from = 0  # the first item in a list is named 0
-        _to = len(buf)  # if there are two items in the list, then len() return 1 --> range(0, 1) = 2 loops
+    for i in range(_from, _to):
+        curVal = buf[i]
 
-        for i in range(_from, _to):
-            curVal = buf[i]
+        for j in range(0, 8):  # C++ stops when J is not < 8 --> same for python in range
+            if ((crcVal ^ curVal) & 0x80) != 0:
+                crcVal = (crcVal << 1) ^ 0x31
 
-            for j in range(0, 8):  # C++ stops when J is not < 8 --> same for python in range
-                if ((crcVal ^ curVal) & 0x80) != 0:
-                    crcVal = (crcVal << 1) ^ 0x31
+            else:
+                crcVal = (crcVal << 1)
 
-                else:
-                    crcVal = (crcVal << 1)
+            curVal = (curVal << 1)  # this line is in the "for j" loop, not in the "for i" loop
 
-                curVal = (curVal << 1)  # this line is in the "for j" loop, not in the "for i" loop
+    checksum = crcVal & 0xff  # keep only the 8 last bits
 
-        checksum = crcVal & 0xff  # keep only the 8 last bits
+    return checksum
 
-        return checksum
-
-    def check(self, checksum, *data):
-        """
-        Check that the data transmitted are correct using the data and the checksum
-        :param data: List containing the data to be digested (see sensor doc)
-        :param checksum: Checksum given by the sensor
-        :return:
-        """
-        calculation = CRC8.digest(self, data)
-        if calculation == checksum:
-            return True
-        else:
-            log = "CRC8 does not fit. Data are wrong"
-            logging.debug(log)
-            return False
+def check(checksum, data):
+    """
+    Check that the data transmitted are correct using the data and the checksum
+    :param data: List containing the data to be digested (see sensor doc)
+    :param checksum: Checksum given by the sensor
+    :return:
+    """
+    calculation = digest(data)
+    if calculation == checksum:
+        log = "CRC8 is correct. Data are valid."
+        logger.debug(log)
+        return True
+    else:
+        log = "CRC8 does not fit. Data are wrong"
+        logging.debug(log)
+        return False
 
 
 def request_measurement():
@@ -126,16 +116,16 @@ def request_measurement():
 
     # In the settings of the sensor, the firmware automatically make measurement every x seconds
     # Sending this STATUS will request a new measurement IF the previous one is older than 10 seconds
-    print('Sending status execution.')
+    print('Requesting a new measurement on the CO2 sensor')
 
     try:
         status = bus.read_byte_data(CO2_address, 0x71)
         log = "Reading status on the CO2 sensor"
-        logger.info(log)
+        logger.debug(log)
 
         if (status != 0):
             log = "CO2 sensor status is not ok. Value read is " + str(status)
-            logger.info(log)
+            logger.debug(log)
 
         return status
 
@@ -177,14 +167,14 @@ def getRHT():
                 # recommendation concerning I²C comm)
                 reading_trials += 1  # increment of reading_trials
 
-            if reading_trials = 3:
+            if reading_trials == 3:
                 log = "RH and temperature lecture from CO2 sensor aborted. i2c transmission problem."
                 logger.critical(log)
                 return [-1, -1]
 
         reading = list(read)
-        if CRC8.check(reading[2], reading[0], reading[1])\
-                and CRC8.check(reading[5], reading[3], reading[4]):
+        print(reading)
+        if check(reading[2], [reading[0], reading[1]]) and check(reading[5], [reading[3], reading[4]]):
             # reading << 8 = shift bytes 8 times to the left, equally, add 8 times 0 on the right
             temperature = round(((reading[0] << 8) + reading[1]) / 100 - 273.15, 2)
             relative_humidity = ((reading[3] << 8) + reading[4]) / 100
@@ -198,7 +188,7 @@ def getRHT():
 
         else:
             attempts += 1
-            if attempts = 3:
+            if attempts == 3:
                 log = "Error in the data received. Temperature and humidity reading aborted"
                 logger.error(log)
                 return [-1, -1]  # indicate that the data are wrong
@@ -206,7 +196,7 @@ def getRHT():
                 log = "Error in the data received. Reading data again... (" + str(attempts) + "/3)"
                 logger.error(log)
 
-        if attempts = 3:
+        if attempts == 3:
             return [-1, -1] # indicate that the data are wrong
 
 
@@ -243,17 +233,15 @@ def getCO2P():
                 # recommendation concerning I²C comm)
                 reading_trials += 1  # increment of reading_trials
 
-            if reading_trials = 3:
+            if reading_trials == 3:
                 log = "RH and temperature lecture from CO2 sensor aborted. i2c transmission problem."
                 logger.critical(log)
                 return [-1, -1, -1] # indicate that the data are wrong
 
         reading = list(read)
-        if CRC8.check(reading[2], reading[0], reading[1])\
-                and CRC8.check(reading[5], reading[3], reading[4])\
-                and CRC8.check(reading[8], reading[6], reading[7]):
+        if check(reading[2], [reading[0], reading[1]]) and check(reading[5], [reading[3], reading[4]]) and check(reading[8], [reading[6], reading[7]]):
             CO2_average = (reading[0] << 8) + reading[1]
-            print ("CO2 average is:", -CO2_average, "ppm")
+            print ("CO2 average is:", CO2_average, "ppm")
 
             CO2_raw = (reading[3] << 8) + reading[4]
             print("CO2 instant is:", CO2_raw, "ppm")
@@ -268,7 +256,7 @@ def getCO2P():
 
         else:
             attempts += 1
-            if attempts = 3:
+            if attempts == 3:
                 log = "Error in the data received. CO2 and pressure reading aborted"
                 logger.error(log)
                 return [-1, -1, -1]  # indicate that the data are wrong

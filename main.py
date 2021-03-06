@@ -45,6 +45,7 @@ logging.info(log)
 
 PATH_CSV = "seacanairy.csv"
 
+
 def append_data_to_csv(data_to_write):
     """
     Store all the measurements in the .csv file
@@ -57,5 +58,5 @@ def append_data_to_csv(data_to_write):
     csv_file.close()
 
 
-
+now = datetime.now()
 
