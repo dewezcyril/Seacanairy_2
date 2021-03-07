@@ -40,7 +40,7 @@ else:
     message_level = logging.INFO
     # If you run this code from another file (using this one as a library), it will only print INFO messages
 
-log_file = './log/CO2.log'
+log_file = '/home/pi/seacanairy_project/log/CO2.log' # complete location needed on the RPI
 
 # set up logging to file - see previous section for more details
 logging.basicConfig(level=message_level,
@@ -69,6 +69,7 @@ def digest(buf):
     :param data: List of data to digest
     :return: checksum
     """
+    # Translation of the C++ code given in the documentation
     crcVal = 0xff
     _from = 0  # the first item in a list is named 0
     _to = len(buf)  # if there are two items in the list, then len() return 1 --> range(0, 1) = 2 loops
@@ -103,7 +104,7 @@ def check(checksum, data):
         return True
     else:
         log = "CRC8 does not fit. Data are wrong"
-        logging.debug(log)
+        logger.debug(log)
         return False
 
 
@@ -156,20 +157,20 @@ def getRHT():
 
         while reading_trials < 4:
             try:
+                time.sleep(1)  # if transmission fails, wait a bit to try again
                 with SMBus(1) as bus:
                     bus.i2c_rdwr(write, read)
                 break  # break the loop if the try has not failed at the previous line
 
             except:
                 if reading_trials == 3:
-                    log = "RH and temperature lecture from CO2 sensor aborted. i2c transmission problem."
+                    log = "RH and temperature lecture from CO2 sensor aborted. (3/3) i2c transmission problem."
                     logger.critical(log)
-                    return [-1, -1]
+                    return [-255, -255] # indicate on the SD card that data are wrong
                 reading_trials += 1  # increment of reading_trials
-                log = "Error in the i2c transmission. Trying again..."
+                log = "Error in the i2c transmission. Trying again... (" + str(reading_trials + 1) + ")"
                 logger.error(log)
-                time.sleep(1)  # if I²C comm fails, wait a little bit before the next reading (this is a general
-                # recommendation concerning I²C comm)
+
 
 
         reading = list(read)
@@ -188,15 +189,16 @@ def getRHT():
         else:
             attempts += 1
             if attempts == 3:
-                log = "Error in the data received. Temperature and humidity reading aborted"
+                log = "Error in the data received. (3/3) Temperature and humidity reading aborted"
                 logger.error(log)
-                return [-1, -1]  # indicate that the data are wrong
+                return [-255, -255]  # indicate on the SD card that data are wrong
             else:
                 log = "Error in the data received. Reading data again... (" + str(attempts) + "/3)"
                 logger.error(log)
+                time.sleep(1)
 
         if attempts == 3:
-            return [-1, -1] # indicate that the data are wrong
+            return [-255, -255] # indicate on the SD card that data are wrong
 
 
 def getCO2P():
@@ -221,6 +223,8 @@ def getCO2P():
 
         while reading_trials < 4:
             try:
+                time.sleep(1)  # if I²C comm fails, wait a little bit before the next reading (this is a general
+                # recommendation concerning I²C comm)
                 with SMBus(1) as bus:
                     bus.i2c_rdwr(write, read)
                 break  # break the loop if the try has not failed at the previous line
@@ -229,24 +233,21 @@ def getCO2P():
                 if reading_trials == 3:
                     log = "RH and temperature lecture from CO2 sensor aborted. i2c transmission problem."
                     logger.critical(log)
-                    return [-1, -1, -1]  # indicate that the data are wrong
-                log = "Error in the i2c transmission. Trying again..."
+                    return [-255, -255, -255]  # indicate that the data are wrong
+                log = "Error in the i2c transmission. Trying again... (" + str(reading_trials + 1) + "/3)"
                 logger.error(log)
-                time.sleep(1)  # if I²C comm fails, wait a little bit before the next reading (this is a general
-                # recommendation concerning I²C comm)
                 reading_trials += 1  # increment of reading_trials
 
 
         reading = list(read)
         if check(reading[2], [reading[0], reading[1]]) and check(reading[5], [reading[3], reading[4]]) and check(reading[8], [reading[6], reading[7]]):
-            CO2_average = (reading[0] << 8) + reading[1]
+            CO2_average = (reading[0] << 8) + reading[1] # reading << 8 = shift bytes 8 times to the left
             print ("CO2 average is:", CO2_average, "ppm")
 
             CO2_raw = (reading[3] << 8) + reading[4]
             print("CO2 instant is:", CO2_raw, "ppm")
 
-            # reading << 8 = shift bytes 8 times to the left, equally, add 8 times 0 on the right
-            pressure = (((reading[6]) << 8) + reading[7]) / 10
+            pressure = (((reading[6]) << 8) + reading[7]) / 10 # reading << 8 = shift bytes 8 times to the left
             print("Pressure is:",  pressure, "mbar")
 
             CO2_P = [CO2_average, CO2_raw, pressure]  # create a chain of values to be returned by the function
@@ -258,7 +259,7 @@ def getCO2P():
             if attempts == 3:
                 log = "Error in the data received. CO2 and pressure reading aborted"
                 logger.error(log)
-                return [-1, -1, -1]  # indicate that the data are wrong
+                return [-255, -255, -255]  # indicate that the data are wrong
             else:
                 log = "Error in the data received. Reading data again... (" + str(attempts) + "/3)"
                 logger.error(log)
@@ -278,7 +279,7 @@ def set_time_interval(seconds):
     while attempts < 3:
         try:
 
-            CRC8.digest()
+            digest()
             log = "CRC8 calculation for timestamp change is " + str(checksum)
             logger.debug(log)
 
@@ -352,9 +353,9 @@ def write_calibration(calibration, offset, gain, lower_limit, upper_limit):
 # ---------------------------------------------------------------------
 if __name__ == '__main__':
     now = datetime.now()
-    logging.info("------------------------------------")
+    logger.info("------------------------------------")
     log = "Launching a new execution on the " + str(now.strftime("%d/%m/%Y %H:%M:%S"))
-    logging.info(log)
+    logger.info(log)
 
     while (True):
         getRHT()
