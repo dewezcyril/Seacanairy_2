@@ -1,5 +1,5 @@
 #---------------------------------------------------------------------
-# CO2 sensor
+# CO2_data sensor
 #---------------------------------------------------------------------
 
 #copy-pasted from the pdf of Epulse: https://www.epluse.com/en/products/co2-measurement/co2-sensor/ee894/
@@ -20,7 +20,7 @@ MV_4_LO = 0xE1          # ControlByte for reading Measurement value 4 Low-Byte
 MV_4_HI = 0xF1          # ControlByte for reading Measurement value 4 High-Byte
 E2_DEVICE_ADR = 0       # Address of E2-slave-Device
 TEMP_RH = 0xE000        # Read the temperature value in 0.01 Kelvin and relative humidity value in 0.01 %
-CO2_PRESS = 0xE027      # Read the averaged CO2 value in 1 ppm, the raw CO2 value in 1 ppm and ambient pressure in 0.1 mbar
+CO2_PRESS = 0xE027      # Read the averaged CO2_data value in 1 ppm, the raw CO2_data value in 1 ppm and ambient pressure in 0.1 mbar
 CUSTOM = 0x7154         # Command for measurement time configuration and customer adjustment
 
 # declaration of functions
@@ -32,7 +32,7 @@ CUSTOM = 0x7154         # Command for measurement time configuration and custome
 #fl_E2bus_Read_RH(void) # Read Measurement Value 1 (relativ Humidity [%RH])
 #fl_E2bus_Read_Temp(void) # Read Measurement Value 2 (Temperature [°C])
 #fl_E2bus_Read_pres(void) # Read Measurement Value 3 (Ambient pressure [mbar])
-#fl_E2bus_Read_CO2_MEAN(void) # Read Measurement Value 4 (CO2 MEAN [ppm])
+#fl_E2bus_Read_CO2_MEAN(void) # Read Measurement Value 4 (CO2_data MEAN [ppm])
 #unsigned char fl_E2bus_Read_Status(void) #read Statusbyte from E2-Interface
 
 #from the documentation
@@ -54,7 +54,7 @@ DELAY_FACTOR = 2    # delay factor for configuration of interface speed
 temperature = int.from_bytes(T, 'big') /100 - 273.15
 
 #-------------------------------------------------------------------
-# CO2 and pressure
+# CO2_data and pressure
 #-------------------------------------------------------------------
 
 # & = AND gate --> 1 & 1 = 1 ; 1 & 0 = 0 ; 0 & 1 = 1 ; 0 & 0 = 0
@@ -75,7 +75,7 @@ else:
  logging.warning("CRC8 check found mistake in the data transmission for temperature")
 
 # -----------------------------------------------------------------
-# CRC8 for RHT
+# CRC8 for RHT_data
 # -----------------------------------------------------------------
  # checking for temperature
  check.update(reading[0])
@@ -89,7 +89,7 @@ else:
   logger.debug(log)
 
  else:
-  log = "CRC8 check found mistake in the I²C transmission for temperature from CO2 sensor"
+  log = "CRC8 check found mistake in the I²C transmission for temperature from CO2_data sensor"
   logger.warning(log)
   log = "CRC8 from sensor is " + str(reading[2]) + " and CRC8 calculation is " + str(crc8)
   logger.warning(log)
@@ -118,15 +118,15 @@ else:
  logger.debug(log)
 
 # ------------------------------------------
-# CO2 ...
+# CO2_data ...
 # ------------------------------------------
 
  if checksum == reading[2]:
-  log = "CRC8 is correct. CO2 average transmission is correct"
+  log = "CRC8 is correct. CO2_data average transmission is correct"
   logger.debug(log)
 
  else:
-  log = "CRC8 check found mistake in the I²C transmission for CO2 average"
+  log = "CRC8 check found mistake in the I²C transmission for CO2_data average"
   logger.warning(log)
   log = "CRC8 from sensor is " + str(reading[2]) + " and CRC8 calculation is " + str(checksum)
   logger.warning(log)
@@ -138,11 +138,11 @@ else:
  logger.debug(log)
 
  if checksum == reading[5]:
-  log = "CRC8 is correct. CO2 raw transmission is correct"
+  log = "CRC8 is correct. CO2_data raw transmission is correct"
   logger.debug(log)
 
  else:
-  log = "CRC8 check found mistake in the I²C transmission for CO2 raw"
+  log = "CRC8 check found mistake in the I²C transmission for CO2_data raw"
   logger.warning(log)
   log = "CRC8 from sensor is " + str(reading[5]) + "  and CRC8 calculation is " + str(checksum)
   logger.warning(log)
