@@ -4,7 +4,7 @@
 * **OPC-N3.py**: code imported from an [online example](https://github.com/JarvisSan22/OPC-N3_python), to retrieve the data from the [Alphasense PM OPC-N3 sensor](http://www.alphasense.com/index.php/products/optical-particle-counter/)
 * **Start_to_tshirp.py**: code to retrieve the voltage of a [4 sensors AFE board from Alphasense](http://www.alphasense.com/index.php/products/support-circuits-air/), measured by a [Pi-16ADC](https://alchemy-power.com/pi-16adc/)
 * **ADC and 4-AFE Board.py**: adaptation of the previous code for use via functions
-* **main.py**: final code launching the functions inside the other python files
+* **seacanairy.py**: final code launching the functions inside the other python files
 * _**draft.py**: draft document where ideas and non-used part of code are stored_
 # Link to the official documentation
 ### E+E Elektronik EE894 CO2 sensor
@@ -17,3 +17,4 @@
 Cyril Dewez,
 21 years old,
 Student in Master year at the Antwerp Maritime Academy (Belgium).
+dewezcyril@gmail.com
