@@ -389,7 +389,7 @@ def getmeasurement():
     Start the fan_status, the laser, get measurement, stop the laser and stop de fan_status.
     :return: Measurements
     """
-    initiate()
+    initiate_transmission()
     time.sleep(1)
     fanOn()
     time.sleep(5)
@@ -410,4 +410,4 @@ def getmeasurement():
 if __name__ == "__main__":
     while True:
         getmeasurement()
-        time.sleep(5)
+        time.sleep(10)

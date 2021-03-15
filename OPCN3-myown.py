@@ -128,7 +128,7 @@ def initiate_power_state_control():
             return False
 
 
-GetReadyResponse([0x03])
+
 
 
 # if initiate_power_state_control():

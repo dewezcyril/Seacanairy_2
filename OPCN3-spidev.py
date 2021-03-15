@@ -11,6 +11,7 @@ import struct
 import datetime
 import sys
 import os.path
+# import RPi.GPIO as GPIO
 
 # --------------------------------------------------------
 # LOGGING SETTINGS
@@ -55,11 +56,16 @@ device = 0 # name of the SS (Ship Selection) pin used for the OPC-N3
 spi = spidev.SpiDev() # enable SPI
 spi.open(bus, device)
 spi.max_speed_hz = 500000 # 750 kHz
-spi.mode = 0b01
+spi.mode = 0b01  # bytes(0b01) = int(1) --> SPI mode 1
 # first bit (from right) = CPHA = 0 --> data are valid when clock is rising
-# seco,d bit (from right) = CPOL = 0 --> clock is kept low when idle
-wait_after_command_byte = 0.015 # 15 ms
-wait_between_bytes = 1e-06
+# second bit (from right) = CPOL = 0 --> clock is kept low when idle
+wait_10_milli = 0.015  # 15 ms
+wait_10_micro = 1e-06
+wait_reset_SPI_buffer = 3  # 3 seconds
+
+# CS (chip selection) manually via GPIO
+# GPIO.setmode(GPIO.board)  # use the GPIO names (GPIO1...) instead of the processor pin name (BCM...)
+# OPCN3_CS = 'GPIO25'
 
 # ----------------------------------------------
 # OPC-N3 variables
@@ -69,85 +75,46 @@ power = 0x03
 histogram = 0x30
 
 
-def initiate():
-    """
-    Initiate the SPI communication to the OPC-N3 sensor.
-    :return: nothing
-    """
-
-    log = "Initiate the SPI communication of the OPC-N3"
-    logger.debug(log)
-
-    time.sleep(1)
-    log = "Sending bytes to the sensor..."
-    logger.debug(log)
-    spi.writebytes([0x5A, 0x01])
-    reading = spi.readbytes(3)
-    log = "Data read after sending bytes are: " + str(reading)
-    logger.debug(log)
-    time.sleep(wait_between_bytes)
-
-    log = "Sending bytes to the sensor..."
-    logger.debug(log)
-    spi.writebytes([0x5A, 0x03])
-    reading = spi.readbytes(9)
-    log = "Bytes read after sending bytes are: " + str(reading)
-    logger.debug(log)
-    time.sleep(wait_between_bytes)
-
-    # SPI conncetion
-    log = "Sending bytes to the sensor..."
-    logger.debug(log)
-    spi.writebytes([0x5A, 0x02, 0x92, 0x07])
-    reading = spi.readbytes(2)
-    log = "Bytes read after sending bytes are: " + str(reading)
-    logger.debug(log)
-    time.sleep(wait_between_bytes)
-
-    return
-
-
-def initiate_transmission(write=0x03):
+def initiate_transmission():
     """
     First step of the OPC-N3 SPI flow chart
-    :return: TRUE when power state has been initiated
+    :return: TRUE when power state has been initiated, following time delay is included
     """
-    attempts = 0  # Flowchart time reset
+    attempts = 0  # sensor is busy loop
+    cycle = 0  # SPI buffer reset loop (going to the right on the flowchart)
 
     log = "Initiate transmission"
     logger.debug(log)
 
-    while True:
-        log = "Sending " + str(hex(write)) + " bytes"
-        logger.debug(log)
-        answer = spi.xfer2([write])  # Initiate control of power state
-        print("Answer to xfer2 is", answer)
-        time.sleep(wait_between_bytes)
-        reading = spi.readbytes(10)
-        log = "Reading is: " + str(reading)
-        logger.debug(log)
-        # print(reading)
-        attempts += 1  # increment of attempts
+    reading = spi.readbytes(1)  # to flush previous data in the buffer
 
-        if reading == [0xF3]:
-            log = "Acknowledge byte received"
-            logger.debug(log)
-            time.sleep(wait_between_bytes)
-            return True
+    spi.writebytes(0x03)  # initiate control of power state
+    time.sleep(wait_10_micro)  # delay between all SPI communications
+
+    while cycle < 3:
+        reading = spi.readbytes(1)
+
+        if reading == [243]:  # 243 = 0xF3 --> SPI ready
+            time.sleep(wait_10_micro)
+            return True  # if function wll continue working once true is returned
+
+        elif reading == [49]:  # 49 = 0x31 --> SPI busy
+            attempts += 1
+            time.sleep(wait_10_milli)
 
         elif attempts > 20:
-            log = "Failed to initiate power control. Wiring may not be correct."
+            log = "Failed 20 times to initiate control of power state, reset OPC-N3 SPI buffer"
             logger.critical(log)
-            time.sleep(3)  # time for spi buffer to reset
+            time.sleep(wait_reset_SPI_buffer)  # time for spi buffer to reset
             # reset SPI  connection
             # initOPC(ser)
-            attempts = 0
-            return False
+            attempts = 0  # reset the "SPI busy" loop
+            cycle += 1  # increment of the SPI reset loop
 
         else:
             time.sleep(1)  # wait 1e-05 before next command
-            log = "Power control initiation failed. Trying again..."
-            logger.error(log)
+            attempts += 1  # increment of attempts
+
 
 
 def fanOff():
@@ -199,7 +166,7 @@ def LaserOn():
         spi.writebytes([0x61, 0x07])
         nl = spi.readbytes(2)
         print("Answer is", nl)
-        time.sleep(wait_between_bytes)
+        time.sleep(wait_10_micro)
         log = "Laser is ON"
         logger.info(log)
         return True
@@ -216,7 +183,7 @@ def LaserOff():
         spi.writebytes([0x61, 0x06])
         nl = spi.readbytes(2)
         print("Answer is", nl)
-        time.sleep(wait_between_bytes)
+        time.sleep(wait_10_micro)
         log = "Laser is Off"
         logger.info(log)
         return False
@@ -369,7 +336,7 @@ def getHist():
 
             # ans=bytearray(ser.read(1))
             #    print("ans=",ans,"len",len(ans))
-            time.sleep(wait_between_bytes)  # delay
+            time.sleep(wait_10_micro)  # delay
             ans = bytearray(ser.readall())
             print("ans=", ans, "len", len(ans))
             ans = filter_data(ans)  # get the wanted data bytes
@@ -407,7 +374,10 @@ def getmeasurement():
     return
 
 
-if __name__ == "__main__":
-    while True:
-        getmeasurement()
-        time.sleep(15)
+
+if initiate_transmission():
+    print("transmission initiated")
+else:
+    print("failed in initiating the transmission")
+
+spi.close()

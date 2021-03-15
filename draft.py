@@ -160,3 +160,45 @@ else:
    logger.warning(log)
    log = "CRC8 from sensor is " + str(reading[8]) + " and CRC8 calculation is " + str(checksum)
    logger.warning(log)
+
+
+# ------------------------------------------
+# OPC-N3
+# ------------------------------------------
+
+  def initiate():
+   """
+   Initiate the SPI communication to the OPC-N3 sensor.
+   :return: nothing
+   """
+
+   log = "Initiate the SPI communication of the OPC-N3"
+   logger.debug(log)
+
+   time.sleep(1)
+   log = "Sending bytes to the sensor..."
+   logger.debug(log)
+   spi.writebytes([0x5A, 0x01])
+   reading = spi.readbytes(3)
+   log = "Data read after sending bytes are: " + str(reading)
+   logger.debug(log)
+   time.sleep(wait_between_bytes)
+
+   log = "Sending bytes to the sensor..."
+   logger.debug(log)
+   spi.writebytes([0x5A, 0x03])
+   reading = spi.readbytes(9)
+   log = "Bytes read after sending bytes are: " + str(reading)
+   logger.debug(log)
+   time.sleep(wait_between_bytes)
+
+   # SPI conncetion
+   log = "Sending bytes to the sensor..."
+   logger.debug(log)
+   spi.writebytes([0x5A, 0x02, 0x92, 0x07])
+   reading = spi.readbytes(2)
+   log = "Bytes read after sending bytes are: " + str(reading)
+   logger.debug(log)
+   time.sleep(wait_between_bytes)
+
+   return
