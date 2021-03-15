@@ -58,16 +58,14 @@ wait = 1e-06
 # ----------------------------------------------
 
 
-
-
 ser = Serial(
-    port = SPI_address_RPI,
-    baudrate = 960,
-    parity = 'N',
-    stopbits = 1,
-    bytesize = 8,
-    xonxoff = False,
-    timeout = wait
+    port=SPI_address_RPI,
+    baudrate=9600,
+    parity='N',
+    stopbits=1,
+    bytesize=8,
+    xonxoff=False,
+    timeout=wait
 )
 
 print("Serial port used is: ", ser.name)
@@ -81,7 +79,6 @@ def initiate():
     Initiate the SPI communication to the OPC-N3 sensor.
     :return: nothing
     """
-
 
     log = "Initiate the SPI communication of the OPC-N3"
     logger.debug(log)
@@ -408,6 +405,7 @@ def getmeasurement():
     time.sleep(.1)
     ser.close()
     return
+
 
 if __name__ == "__main__":
     while True:

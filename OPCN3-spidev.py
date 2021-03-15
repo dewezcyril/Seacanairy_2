@@ -54,8 +54,8 @@ bus = 0  # name of the SPI bus on the Raspberry Pi 3B+
 device = 0 # name of the SS (Ship Selection) pin used for the OPC-N3
 spi = spidev.SpiDev() # enable SPI
 spi.open(bus, device)
-spi.max_speed_hz = 750000 # 750 kHz
-spi.mode = 0b00
+spi.max_speed_hz = 500000 # 750 kHz
+spi.mode = 0b01
 # first bit (from right) = CPHA = 0 --> data are valid when clock is rising
 # seco,d bit (from right) = CPOL = 0 --> clock is kept low when idle
 wait_after_command_byte = 0.015 # 15 ms
@@ -109,7 +109,7 @@ def initiate():
 
 def initiate_transmission(write=0x03):
     """
-    First step of the OPC-N3 SPI communication
+    First step of the OPC-N3 SPI flow chart
     :return: TRUE when power state has been initiated
     """
     attempts = 0  # Flowchart time reset
@@ -118,17 +118,18 @@ def initiate_transmission(write=0x03):
     logger.debug(log)
 
     while True:
-        log = "Sending " + str(write) + " bytes"
+        log = "Sending " + str(hex(write)) + " bytes"
         logger.debug(log)
-        spi.writebytes([write])  # Initiate control of power state
+        answer = spi.xfer2([write])  # Initiate control of power state
+        print("Answer to xfer2 is", answer)
         time.sleep(wait_between_bytes)
-        reading = spi.readbytes(1)
+        reading = spi.readbytes(10)
         log = "Reading is: " + str(reading)
         logger.debug(log)
         # print(reading)
         attempts += 1  # increment of attempts
 
-        if reading == [36]:
+        if reading == [0xF3]:
             log = "Acknowledge byte received"
             logger.debug(log)
             time.sleep(wait_between_bytes)
@@ -388,6 +389,7 @@ def getmeasurement():
     :return: Measurements
     """
     initiate()
+    initiate_transmission()
     time.sleep(1)
     fanOn()
     time.sleep(5)
