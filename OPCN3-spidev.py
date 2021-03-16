@@ -110,8 +110,8 @@ def initiate_transmission(command_byte=0x03):
 
         if reading == [243]:  # 243 = 0xF3 --> SPI ready
             time.sleep(wait_10_micro)
-            spi.writebytes([command_byte])
-            time.sleep(wait_10_milli)
+            #spi.writebytes([command_byte])
+            #time.sleep(wait_10_milli)
             return True  # if function wll continue working once true is returned
 
         elif reading == [49]:  # 49 = 0x31 --> SPI busy
@@ -121,9 +121,11 @@ def initiate_transmission(command_byte=0x03):
         elif attempts > 20:
             log = "Failed 20 times to initiate control of power state, reset OPC-N3 SPI buffer"
             logger.critical(log)
+            cs_high()
             time.sleep(wait_reset_SPI_buffer)  # time for spi buffer to reset
             log = "Trying again..."
             logger.info(log)
+            cs_low()
             # reset SPI  connection
             # initOPC(ser)
             attempts = 0  # reset the "SPI busy" loop
