@@ -11,7 +11,7 @@ import struct
 import datetime
 import sys
 import os.path
-# import RPi.GPIO as GPIO
+import RPi.GPIO as GPIO
 
 # --------------------------------------------------------
 # LOGGING SETTINGS
@@ -46,16 +46,15 @@ logging.getLogger().addHandler(console)
 
 logger = logging.getLogger('OPC-N3')
 
-
 # ----------------------------------------------
 # SPI CONFIGURATION
 # ----------------------------------------------
 
 bus = 0  # name of the SPI bus on the Raspberry Pi 3B+
-device = 0 # name of the SS (Ship Selection) pin used for the OPC-N3
-spi = spidev.SpiDev() # enable SPI
+device = 0  # name of the SS (Ship Selection) pin used for the OPC-N3
+spi = spidev.SpiDev()  # enable SPI
 spi.open(bus, device)
-spi.max_speed_hz = 500000 # 750 kHz
+spi.max_speed_hz = 500000  # 750 kHz
 spi.mode = 0b01  # bytes(0b01) = int(1) --> SPI mode 1
 # first bit (from right) = CPHA = 0 --> data are valid when clock is rising
 # second bit (from right) = CPOL = 0 --> clock is kept low when idle
@@ -64,8 +63,23 @@ wait_10_micro = 1e-06
 wait_reset_SPI_buffer = 3  # 3 seconds
 
 # CS (chip selection) manually via GPIO
-# GPIO.setmode(GPIO.board)  # use the GPIO names (GPIO1...) instead of the processor pin name (BCM...)
-# OPCN3_CS = 'GPIO25'
+GPIO.setmode(GPIO.BCM)  # use the GPIO names (GPIO1...) instead of the processor pin name (BCM...)
+CS = 25
+GPIO.setup(CS, GPIO.OUT, initial=GPIO.HIGH)
+
+
+def cs_high(delay=0.010):
+    """Close communication with OPC-N3 by setting CS on HIGH"""
+    time.sleep(delay)
+    GPIO.output(CS, GPIO.HIGH)
+    time.sleep(delay)
+
+
+def cs_low(delay=0.010):
+    """Open communication with OPC-N3 by setting CS on LOW"""
+    time.sleep(delay)
+    GPIO.output(CS, GPIO.LOW)
+    time.sleep(delay)
 
 # ----------------------------------------------
 # OPC-N3 variables
@@ -75,7 +89,7 @@ power = 0x03
 histogram = 0x30
 
 
-def initiate_transmission():
+def initiate_transmission(command_byte=0x03):
     """
     First step of the OPC-N3 SPI flow chart
     :return: TRUE when power state has been initiated, following time delay is included
@@ -86,26 +100,30 @@ def initiate_transmission():
     log = "Initiate transmission"
     logger.debug(log)
 
-    reading = spi.readbytes(1)  # to flush previous data in the buffer
-
-    spi.writebytes(0x03)  # initiate control of power state
+    # reading = spi.readbytes(1)  # to flush previous data in the buffer
     time.sleep(wait_10_micro)  # delay between all SPI communications
 
     while cycle < 3:
-        reading = spi.readbytes(1)
+        reading = spi.xfer([command_byte])  # initiate control of power state
+        # time.sleep(0.001)  # 1 ms
+        # reading = spi.readbytes(1)
 
         if reading == [243]:  # 243 = 0xF3 --> SPI ready
             time.sleep(wait_10_micro)
+            spi.writebytes([command_byte])
+            time.sleep(wait_10_milli)
             return True  # if function wll continue working once true is returned
 
         elif reading == [49]:  # 49 = 0x31 --> SPI busy
             attempts += 1
-            time.sleep(wait_10_milli)
+            # time.sleep(wait_10_milli)
 
         elif attempts > 20:
             log = "Failed 20 times to initiate control of power state, reset OPC-N3 SPI buffer"
             logger.critical(log)
             time.sleep(wait_reset_SPI_buffer)  # time for spi buffer to reset
+            log = "Trying again..."
+            logger.info(log)
             # reset SPI  connection
             # initOPC(ser)
             attempts = 0  # reset the "SPI busy" loop
@@ -115,6 +133,8 @@ def initiate_transmission():
             time.sleep(1)  # wait 1e-05 before next command
             attempts += 1  # increment of attempts
 
+def read_serial_number_string():
+    initiate_transmission(16)  # 0x10
 
 
 def fanOff():
@@ -122,16 +142,17 @@ def fanOff():
     Turn OFF the fan_status of the OPC-N3.
     :return: FALSE
     """
-    log = "Turning fan_status OFF"
+    log = "Turning fan OFF"
     logger.debug(log)
-
+    response = []
+    spi.open(0, 0)
+    # time.sleep(0.010)
+    cs_low()
     if initiate_transmission():
-        spi.writebytes([0x61, 0x02])
-        reading = spi.readbytes(2)
-        print("Answer is", reading)
-        time.sleep(2)
-        log = "Fan off"
-        logger.info(log)
+        spi.writebytes([2])
+        cs_high()
+        spi.close()
+        print("Fan is OFF")
         return False
 
 
@@ -140,16 +161,19 @@ def fanOn():
     Turn fan_status of the OPC-N3 ON.
     :return: TRUE
     """
-    log = "Turning fan_status on"
+    log = "Turning fan on"
     logger.debug(log)
-
+    response = []
+    spi.open(0, 0)
+    # time.sleep(0.010)
+    cs_low()
     if initiate_transmission():
-        spi.writebytes([0x61, 0x03])
-        nl = spi.readbytes(2)
-        print("Answer is", nl)
-        time.sleep(2)
-        log = "Fan is On"
-        logger.info(log)
+        spi.writebytes([3])
+        cs_high()
+        # time.sleep(0.010)
+        spi.close()
+        time.sleep(0.6)  # wait > 600 ms to let the fan start
+        print("Fan is ON")
         return True
 
 
@@ -253,8 +277,8 @@ def Histdata(ans):
 
 def read_all(port, chunk_size=86):
     """Read all characters on the serial port of the OPC-N3 and return them."""
-#    if not port.timeout:
-#        raise TypeError('Port needs to have a timeout set!')
+    #    if not port.timeout:
+    #        raise TypeError('Port needs to have a timeout set!')
 
     read_buffer = b''
 
@@ -375,9 +399,16 @@ def getmeasurement():
 
 
 
-if initiate_transmission():
-    print("transmission initiated")
-else:
-    print("failed in initiating the transmission")
-
+fanOn()
+time.sleep(5)
+fanOff()
+time.sleep(5)
+fanOn()
+time.sleep(5)
+fanOff()
+time.sleep(5)
+fanOn()
+time.sleep(5)
+fanOff()
+time.sleep(5)
 spi.close()
