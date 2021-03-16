@@ -85,14 +85,14 @@ def cs_low(delay=0.010):
 # OPC-N3 variables
 # ----------------------------------------------
 
-power = 0x03
 histogram = 0x30
 
 
-def initiate_transmission(command_byte=0x03):
+def initiate_transmission(command_byte):
     """
-    First step of the OPC-N3 SPI flow chart
-    :return: TRUE when power state has been initiated, following time delay is included
+    Initiate SPI transmission to the OPC-N3
+    First loop of the Flow Chart
+    :return: TRUE when power state has been initiated
     """
     attempts = 0  # sensor is busy loop
     cycle = 0  # SPI buffer reset loop (going to the right on the flowchart)
@@ -100,79 +100,65 @@ def initiate_transmission(command_byte=0x03):
     log = "Initiate transmission"
     logger.debug(log)
 
-    # reading = spi.readbytes(1)  # to flush previous data in the buffer
-    time.sleep(wait_10_micro)  # delay between all SPI communications
+    spi.open(0, 0)
+    cs_low()
 
     while cycle < 3:
         reading = spi.xfer([command_byte])  # initiate control of power state
-        # time.sleep(0.001)  # 1 ms
-        # reading = spi.readbytes(1)
 
-        if reading == [243]:  # 243 = 0xF3 --> SPI ready
+        if reading == [0xF3]:  # SPI ready
             time.sleep(wait_10_micro)
-            #spi.writebytes([command_byte])
-            #time.sleep(wait_10_milli)
             return True  # if function wll continue working once true is returned
 
-        elif reading == [49]:  # 49 = 0x31 --> SPI busy
+        elif reading == [0x31]:  # SPI busy
             attempts += 1
-            # time.sleep(wait_10_milli)
 
         elif attempts > 20:
             log = "Failed 20 times to initiate control of power state, reset OPC-N3 SPI buffer"
             logger.critical(log)
             cs_high()
             time.sleep(wait_reset_SPI_buffer)  # time for spi buffer to reset
+
             log = "Trying again..."
             logger.info(log)
-            cs_low()
-            # reset SPI  connection
-            # initOPC(ser)
             attempts = 0  # reset the "SPI busy" loop
             cycle += 1  # increment of the SPI reset loop
+            cs_low()
 
         else:
+            log = "Unexpected code returned by the sensor, code is" + str(reading)
+            logger.critical(log)
             time.sleep(1)  # wait 1e-05 before next command
             attempts += 1  # increment of attempts
 
-def read_serial_number_string():
-    initiate_transmission(16)  # 0x10
 
-
-def fanOff():
+def fan_off():
     """
-    Turn OFF the fan_status of the OPC-N3.
+    Turn OFF the fan of the OPC-N3.
     :return: FALSE
     """
     log = "Turning fan OFF"
     logger.debug(log)
-    response = []
-    spi.open(0, 0)
-    # time.sleep(0.010)
-    cs_low()
-    if initiate_transmission():
-        spi.writebytes([2])
+
+    if initiate_transmission(0x03):
+        spi.writebytes([0x02])
         cs_high()
         spi.close()
         print("Fan is OFF")
         return False
 
 
-def fanOn():
+def fan_on():
     """
-    Turn fan_status of the OPC-N3 ON.
+    Turn ON the fan of the OPC-N3 ON.
     :return: TRUE
     """
     log = "Turning fan on"
     logger.debug(log)
-    response = []
-    spi.open(0, 0)
-    # time.sleep(0.010)
-    cs_low()
-    if initiate_transmission():
-        spi.writebytes([3])
+
+    if initiate_transmission(0x03):
+        spi.writebytes([0x03])
         cs_high()
-        # time.sleep(0.010)
         spi.close()
         time.sleep(0.6)  # wait > 600 ms to let the fan start
         print("Fan is ON")
@@ -384,7 +370,7 @@ def getmeasurement():
     initiate()
     initiate_transmission()
     time.sleep(1)
-    fanOn()
+    fan_on()
     time.sleep(5)
     LaserOn()
     for x in range(0, 1):
@@ -392,7 +378,7 @@ def getmeasurement():
         time.sleep(1)
         print(getHist())
         time.sleep(5)
-    fanOff()
+    fan_off()
     time.sleep(.1)
     LaserOff()
     time.sleep(.1)
@@ -400,17 +386,7 @@ def getmeasurement():
     return
 
 
+fan_on()
+time.sleep(5)
+fan_off()
 
-fanOn()
-time.sleep(5)
-fanOff()
-time.sleep(5)
-fanOn()
-time.sleep(5)
-fanOff()
-time.sleep(5)
-fanOn()
-time.sleep(5)
-fanOff()
-time.sleep(5)
-spi.close()
