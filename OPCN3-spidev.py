@@ -61,6 +61,7 @@ spi.mode = 0b01  # bytes(0b01) = int(1) --> SPI mode 1
 wait_10_milli = 0.015  # 15 ms
 wait_10_micro = 1e-06
 wait_reset_SPI_buffer = 3  # 3 seconds
+time_for_initiate_transmission = 30
 
 # CS (chip selection) manually via GPIO
 GPIO.setmode(GPIO.BCM)  # use the GPIO names (GPIO1...) instead of the processor pin name (BCM...)
@@ -100,10 +101,12 @@ def initiate_transmission(command_byte):
     log = "Initiate transmission"
     logger.debug(log)
 
+    stop = time.time() + time_for_initiate_transmission
+
     spi.open(0, 0)
     cs_low()
 
-    while cycle < 3:
+    while time.time() < stop:
         reading = spi.xfer([command_byte])  # initiate control of power state
 
         if reading == [0xF3]:  # SPI ready
@@ -126,10 +129,19 @@ def initiate_transmission(command_byte):
             cs_low()
 
         else:
-            log = "Unexpected code returned by the sensor, code is" + str(reading)
+            log = "Failed to initiate transmission, unexpected code returned (" + str(reading) + ")"
             logger.critical(log)
             time.sleep(1)  # wait 1e-05 before next command
             attempts += 1  # increment of attempts
+
+        if cycle >= 3:
+            log = "Failed to initiate transmission (reset 3 times SPI, still error)"
+            logger.critical(log)
+            return False  # function depending on initiate_transmission function will not continue
+
+    if time.time() > stop:
+        log = "Initiate transmission took too much time (> " + str(time_for_initiate_transmission) + " secs)"
+        logger.critical(log)
 
 
 def fan_off():
@@ -139,13 +151,27 @@ def fan_off():
     """
     log = "Turning fan OFF"
     logger.debug(log)
+    attempts = 0
 
-    if initiate_transmission(0x03):
-        spi.writebytes([0x02])
-        cs_high()
-        spi.close()
-        print("Fan is OFF")
-        return False
+    while attempts < 4:
+        if initiate_transmission(0x03):
+            reading = spi.xfer([0x02])
+            cs_high()
+            spi.close()
+            if reading == [0x03]:
+                print("Fan is OFF")
+                return False
+            else:
+                log = "Fan did not stop (code returned is " + str(reading) + ")"
+                logger.error(log)
+                attempts += 1
+                time.sleep(wait_reset_SPI_buffer)
+                log = "Trying again to stop fan..."
+                logger.info(log)
+
+    if attempts >= 4:
+        log = "Failed 4 times to stop the fan"
+        logger.critical(log)
 
 
 def fan_on():
@@ -156,24 +182,39 @@ def fan_on():
     log = "Turning fan on"
     logger.debug(log)
 
-    if initiate_transmission(0x03):
-        spi.writebytes([0x03])
-        cs_high()
-        spi.close()
-        time.sleep(0.6)  # wait > 600 ms to let the fan start
-        print("Fan is ON")
-        return True
+    attempts = 0
+
+    while attempts < 4:
+        if initiate_transmission(0x03):
+            reading = spi.xfer([0x03])
+            cs_high()
+            spi.close()
+            time.sleep(0.6)  # wait > 600 ms to let the fan start
+            if reading == [0x03]:
+                print("Fan is ON")
+                return True
+            else:
+                log = "Fan did not start (code returned is " + str(reading) + ")"
+                logger.error(log)
+                attempts += 1
+                time.sleep(wait_reset_SPI_buffer)
+                log = "Trying again to start fan..."
+                logger.info(log)
+
+    if attempts >= 4:
+        log = "Failed 4 times to start the fan"
+        logger.critical(log)
 
 
-def LaserOn():
+def laser_on():
     """
-    Turn the laser of the OPC-N3 ON.
+    Turn ON the laser of the OPC-N3.
     :return: TRUE
     """
     log = "Turning laser ON"
     logger.debug(log)
 
-    if initiate_transmission():
+    if initiate_transmission(0x03):
         # Lazer on
         spi.writebytes([0x61, 0x07])
         nl = spi.readbytes(2)
@@ -191,8 +232,8 @@ def LaserOff():
     """
     print("Laser Off")
 
-    if initiate_transmission():
-        spi.writebytes([0x61, 0x06])
+    if initiate_transmission(0x03):
+        spi.writebytes([0x06])
         nl = spi.readbytes(2)
         print("Answer is", nl)
         time.sleep(wait_10_micro)
@@ -372,7 +413,7 @@ def getmeasurement():
     time.sleep(1)
     fan_on()
     time.sleep(5)
-    LaserOn()
+    laser_on()
     for x in range(0, 1):
         print(getData())
         time.sleep(1)
