@@ -66,7 +66,7 @@ logger = logging.getLogger('CO2 sensor')
 def digest(buf):
     """
     Digest the data to return the corresponding checksum
-    :param data: List of data to digest
+    :param buf: List of data to digest
     :return: checksum
     """
     # Translation of the C++ code given in the documentation
@@ -89,6 +89,7 @@ def digest(buf):
     checksum = crcVal & 0xff  # keep only the 8 last bits
 
     return checksum
+
 
 def check(checksum, data):
     """
