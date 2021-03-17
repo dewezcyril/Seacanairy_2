@@ -104,7 +104,6 @@ def initiate_transmission(command_byte):
 
     spi.open(0, 0)
     cs_low()
-    time.sleep(0.5)  # avoid too close communication
 
     while time.time() < stop:
         reading = spi.xfer([command_byte])  # initiate control of power state
@@ -173,6 +172,7 @@ def fan_off():
             spi.close()
             if reading == [0x03]:
                 print("Fan is OFF")
+                time.sleep(1)  # avoid too close communication
                 return False
             else:
                 time.sleep(1)  # let time to the OPC-N3 to try to stop the fan
@@ -212,6 +212,7 @@ def fan_on():
             time.sleep(0.6)  # wait > 600 ms to let the fan start
             if reading == [0x03]:
                 print("Fan is ON")
+                time.sleep(1)  # avoid too close communication
                 return True
             else:
                 time.sleep(1)  # let time to the OPC-N3 to try to start the fan
@@ -250,6 +251,7 @@ def laser_on():
             spi.close()
             if reading == [0x03]:
                 print("Laser is ON")
+                time.sleep(1)  # avoid too close communication
                 return True
             else:
                 time.sleep(1)  # let time to the OPC-N3 to try to start the laser
@@ -288,6 +290,7 @@ def laser_off():
             spi.close()
             if reading == [0x03]:
                 print("Laser is OFF")
+                time.sleep(1)  # avoid too close communication
                 return False
             else:
                 time.sleep(1)  # let time to the OPC-N3 to try to stop the laser
@@ -322,6 +325,7 @@ def read_DAC_power_status(item=None):
             response = spi.xfer([0x13, 0x13, 0x13, 0x13, 0x13, 0x13])
             cs_high()
             spi.close()
+            time.sleep(1)  # avoid too close communication
 
             if item == 'fan':
                 log = "DAC power status for " + str(item) + " is " + str(response[0])
@@ -376,24 +380,58 @@ def read_DAC_power_status(item=None):
             break
 
 
+def digest(data):
+    crc = 0xFFFF
+
+    for byteCtr in range(0, len(data)):
+        to_xor = int(data[byteCtr])
+        crc ^= to_xor
+        for bit in range(0, 8):
+            if (crc & 1) == 1:
+                crc >>= 1
+                crc ^= 0xA001
+            else:
+                crc >>= 1
+    log = "Checksum is " + str(crc)
+    logger.debug(log)
+    return crc & 0xFFFF
+
+
+def check(checksum, *data):
+    to_digest = []
+    for i in data:
+        to_digest.extend(i)
+    if digest(to_digest) == join_bytes(checksum):
+        log = "Checksum is correct"
+        logger.debug(log)
+        return True
+    else:
+        log = "Checksum is wrong"
+        logger.debug(log)
+        return False
+
+
 def get_PM():
     if initiate_transmission(0x32):
         PM_A = spi.xfer([0x32, 0x32, 0x32, 0x32])
         PM_B = spi.xfer([0x32, 0x32, 0x32, 0x32])
         PM_C = spi.xfer([0x32, 0x32, 0x32, 0x32])
         checksum = spi.xfer([0x32, 0x32])
+        time.sleep(1)  # avoid too close communication
 
         print(PM_A)
         print(PM_B)
         print(PM_C)
 
-        PM1 = PM_A[3] << 24 + PM_A[2] << 16 + PM_A[1] << 8 + PM_A[0]
-        PM25 = PM_B[3] << 24 + PM_B[2] << 16 + PM_B[1] << 8 + PM_B[0]
-        PM10 = PM_C[3] << 24 + PM_C[2] << 16 + PM_C[1] << 8 + PM_C[0]
+        PM1 = join_bytes(PM_A)
+        PM25 = join_bytes(PM_B)
+        PM10 = join_bytes(PM_C)
 
         print("PM 1 is", PM1, "mg/m3")
         print("PM 2,5 is", PM25, "mg/m3")
         print("PM 10 is", PM10, "mg/m3")
+
+        check(checksum, PM_A, PM_B, PM_C)
 
 
 def read_histogram():
@@ -629,12 +667,11 @@ def getmeasurement():
     return
 
 fan_on()
-time.sleep(5)
 laser_on()
 
-read_histogram()
-time.sleep(5)
-read_histogram()
+get_PM()
+time.sleep(2)
+get_PM()
 
 laser_off()
 fan_off()
