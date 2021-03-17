@@ -72,15 +72,16 @@ GPIO.setup(CS, GPIO.OUT, initial=GPIO.HIGH)
 def cs_high(delay=0.010):
     """Close communication with OPC-N3 by setting CS on HIGH"""
     time.sleep(delay)
-    GPIO.output(CS, GPIO.HIGH)
-    time.sleep(delay)
+    # GPIO.output(CS, GPIO.HIGH)
+    # time.sleep(delay)
 
 
 def cs_low(delay=0.010):
     """Open communication with OPC-N3 by setting CS on LOW"""
     time.sleep(delay)
-    GPIO.output(CS, GPIO.LOW)
-    time.sleep(delay)
+    # GPIO.output(CS, GPIO.LOW)
+    # time.sleep(delay)
+
 
 # ----------------------------------------------
 # OPC-N3 variables
@@ -98,7 +99,7 @@ def initiate_transmission(command_byte):
     attempts = 0  # sensor is busy loop
     cycle = 0  # SPI buffer reset loop (going to the right on the flowchart)
 
-    log = "Initiate transmission"
+    log = "Initiate transmission with command byte " + str(command_byte)
     logger.debug(log)
 
     stop = time.time() + time_for_initiate_transmission
@@ -116,6 +117,13 @@ def initiate_transmission(command_byte):
         elif reading == [0x31]:  # SPI busy
             attempts += 1
 
+        elif reading == [0x24] or reading == [0x92] or reading == [0x49]:
+            attempts += 2  # this is big error, if it occurs, then there are lot of chance if will not work,
+            log = "Problem with the SS (Slave Select) line"
+            logger.critical(log)
+            log = "Check that SS line is well kept DOWN (0V) during transmission. Try again by connecting SS Line to Ground"
+            logger.debug(log)
+
         elif attempts > 20:
             log = "Failed 20 times to initiate control of power state, reset OPC-N3 SPI buffer"
             logger.critical(log)
@@ -129,19 +137,20 @@ def initiate_transmission(command_byte):
             cs_low()
 
         else:
-            log = "Failed to initiate transmission, unexpected code returned (" + str(reading) + ")"
+            log = "Failed to initiate transmission (unexpected code returned: " + str(reading) + ")"
             logger.critical(log)
             time.sleep(1)  # wait 1e-05 before next command
             attempts += 1  # increment of attempts
 
-        if cycle >= 3:
+        if cycle >= 2:
             log = "Failed to initiate transmission (reset 3 times SPI, still error)"
             logger.critical(log)
             return False  # function depending on initiate_transmission function will not continue
 
     if time.time() > stop:
-        log = "Initiate transmission took too much time (> " + str(time_for_initiate_transmission) + " secs)"
+        log = "Transmission initiation took too much time (> " + str(time_for_initiate_transmission) + " secs)"
         logger.critical(log)
+        return False  # function depending on initiate_transmission function will not continue
 
 
 def fan_off():
@@ -162,15 +171,20 @@ def fan_off():
                 print("Fan is OFF")
                 return False
             else:
-                log = "Fan did not stop (code returned is " + str(reading) + ")"
-                logger.error(log)
-                attempts += 1
-                time.sleep(wait_reset_SPI_buffer)
-                log = "Trying again to stop fan..."
-                logger.info(log)
+                reading = read_DAC_power_status('fan')
+                if reading == 0:
+                    log = "Wrong answer received after SPI writing, but fan is well OFF"
+                    logger.info(log)
+                elif reading == 1:
+                    log = "Failed to stop the fan"
+                    logger.error(log)
+                    attempts += 1
+                    time.sleep(wait_reset_SPI_buffer)
+                    log = "Trying again to stop the fan..."
+                    logger.info(log)
 
-    if attempts >= 4:
-        log = "Failed 4 times to stop the fan"
+    if attempts >= 3:
+        log = "Failed 3 times to stop the fan"
         logger.critical(log)
 
 
@@ -194,16 +208,22 @@ def fan_on():
                 print("Fan is ON")
                 return True
             else:
-                log = "Fan did not start (code returned is " + str(reading) + ")"
-                logger.error(log)
-                attempts += 1
-                time.sleep(wait_reset_SPI_buffer)
-                log = "Trying again to start fan..."
-                logger.info(log)
+                reading = read_DAC_power_status('fan')
+                if reading == 1:
+                    log = "Wrong answer received after SPI writing, but fan is well ON"
+                    logger.info(log)
+                elif reading == 0:
+                    log = "Failed to start the fan"
+                    logger.error(log)
+                    attempts += 1
+                    time.sleep(wait_reset_SPI_buffer)
+                    log = "Trying again to start the fan..."
+                    logger.info(log)
 
-    if attempts >= 4:
-        log = "Failed 4 times to start the fan"
+    if attempts >= 3:
+        log = "Failed 3 times to start the fan"
         logger.critical(log)
+        return False  # indicate that fan is OFF
 
 
 def laser_on():
@@ -211,35 +231,127 @@ def laser_on():
     Turn ON the laser of the OPC-N3.
     :return: TRUE
     """
-    log = "Turning laser ON"
+    log = "Turn the laser ON"
     logger.debug(log)
+    attempts = 0
 
-    if initiate_transmission(0x03):
-        # Lazer on
-        spi.writebytes([0x61, 0x07])
-        nl = spi.readbytes(2)
-        print("Answer is", nl)
-        time.sleep(wait_10_micro)
-        log = "Laser is ON"
-        logger.info(log)
-        return True
+    while attempts < 4:
+        if initiate_transmission(0x03):
+            reading = spi.xfer([0x07])
+            cs_high()
+            spi.close()
+            if reading == [0x03]:
+                print("Laser is ON")
+                return True
+            else:
+                reading = read_DAC_power_status('laser')
+                if reading == 1:
+                    log = "Wrong answer received after SPI writing, but laser is well ON"
+                    logger.info(log)
+                elif reading == 0:
+                    log = "Failed to start the laser"
+                    logger.error(log)
+                    attempts += 1
+                    time.sleep(wait_reset_SPI_buffer)
+                    log = "Trying again to start laser..."
+                    logger.info(log)
+
+        if attempts >= 3:
+            log = "Failed 3 times to start the laser"
+            logger.critical(log)
+            return False  # indicate that laser is still off
 
 
-def LaserOff():
+def laser_off():
     """
     Turn the laser of the OPC-N3 OFF.
     :return: FALSE
     """
-    print("Laser Off")
+    log = "Turn the laser OFF"
+    logger.debug(log)
+    attempts = 0
 
-    if initiate_transmission(0x03):
-        spi.writebytes([0x06])
-        nl = spi.readbytes(2)
-        print("Answer is", nl)
-        time.sleep(wait_10_micro)
-        log = "Laser is Off"
-        logger.info(log)
-        return False
+    while attempts < 4:
+        if initiate_transmission(0x03):
+            reading = spi.xfer([0x06])
+            cs_high()
+            spi.close()
+            if reading == [0x03]:
+                print("Laser is OFF")
+                return False
+            else:
+                reading = read_DAC_power_status('laser')
+                if reading == 0:
+                    log = "Wrong answer received after writing, but laser is well off"
+                    logger.info(log)
+                elif reading == 1:
+                    log = "Failed to stop the laser (code returned is " + str(reading) + ")"
+                    logger.error(log)
+                    attempts += 1
+                    time.sleep(wait_reset_SPI_buffer)
+                    log = "Trying again to stop laser..."
+                    logger.info(log)
+
+        if attempts >= 3:
+            log = "Failed 4 times to stop the laser"
+            logger.critical(log)
+            return True  # indicate that laser is still on
+
+
+def read_DAC_power_status(item=None):
+    """
+    Read the status of the Digital to Analog Converter as well as the Power Status
+    :param item: 'fan', 'laser', fanDAC', 'laserDAC', 'laser_switch', 'gain', 'auto_gain_toggle'
+    :return:
+    """
+
+    attempts = 0
+    while attempts < 3:
+        if initiate_transmission(0x13):
+            response = spi.xfer([0x13, 0x13, 0x13, 0x13, 0x13, 0x13])
+            cs_high()
+            spi.close()
+
+            if item == 'fan':
+                log = "DAC power status for " + str(item) + " is " + str(response[0])
+                logger.debug(log)
+                return response[0]
+            elif item == 'laser':
+                log = "DAC power status for " + str(item) + " is " + str(response[1])
+                logger.debug(log)
+                return response[1]
+            elif item == 'fanDAC':
+                log = "DAC power status for " + str(item) + " is " + str(response[2])
+                logger.debug(log)
+                log = "Fan is running at " + str(response[2] / 255 * 100) + "%"
+                logger.info(log)
+                return response[2]
+            elif item == 'laserDAC':
+                log = "DAC power status for " + str(item) + " is " + str(response[3])
+                logger.debug(log)
+                log = "Laser is shining at " + str(response[3] / 255 * 100) + "%"
+                return response [3]
+            elif item == 'laser_switch':
+                log = "DAC power status for " + str(item) + " is " + str(response[4])
+                logger.debug(log)
+                return response[4]
+            elif item == 'gain':
+                response = response[5] & 0x01
+                log = "DAC power status for " + str(item) + " is " + str(response)
+                logger.debug(log)
+                return response
+            elif item == 'auto_gain_toggle':
+                response = response [5] & 0x02
+                log = "DAC power status for " + str(item) + " is " + str(response)
+                logger.debug(log)
+                return response
+            elif item is None:
+                log = "Full DAC power status is " + str(response)
+                logger.debug(log)
+                print(log)
+                return response
+            else:
+                raise ValueError("Argument of 'read_ADC_power_status' is unknown, check your code!")
 
 
 def RHcon(ans):
@@ -421,13 +533,17 @@ def getmeasurement():
         time.sleep(5)
     fan_off()
     time.sleep(.1)
-    LaserOff()
+    laser_off()
     time.sleep(.1)
     ser.close()
     return
 
 
 fan_on()
-time.sleep(5)
+time.sleep(2)
+laser_on()
+time.sleep(1)
+read_DAC_power_status()
+time.sleep(2)
+laser_off()
 fan_off()
-
