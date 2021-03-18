@@ -4,7 +4,7 @@ Software for the retrieve, storing and management of the Seacanairy 2
 
 # import AFE
 import CO2
-# import OPCN3
+import OPCN3
 import time
 from datetime import date, datetime, timedelta
 import csv
@@ -14,7 +14,7 @@ import csv
 # -----------------------------------------
 import logging
 
-log_file = './log/seacanairy.log'
+log_file = '/home/pi/seacanairy_project/log/seacanairy.log'
 
 message_level = logging.DEBUG
 
@@ -38,15 +38,8 @@ logger = logging.getLogger('SEACANAIRY')
 
 # ---------------------------------------
 
-start_time = datetime.now()
-logger.info("------------------------------------")
-log = "Launching a new execution on the " + str(start_time.strftime("%d/%m/%Y %H:%M:%S"))
-logger.info(log)
 
-PATH_CSV = "seacanairy.csv"
-
-sampling_time = 20
-
+timestamp = 60  # secs
 
 def append_data_to_csv(*data_to_write):
     """
@@ -70,27 +63,43 @@ def wait_timestamp(starting_time):
     :param starting_time: time at which the measurement has started
     :return: Function stop when next measurement can start
     """
+    finish_time = time.time()
+    next_launching = starting_time + timestamp
     if finish_time < next_launching:
         print("Waiting", end='')
     else:
-        log = "Measurement took more time than the defined sampling time (" + str(sampling_time) + ")"
+        log = "Measurement took more time than the defined sampling time (" + str(timestamp) + ")"
         logger.error(log)
-    while True:
-        if datetime.now() < next_launching:
-            time.sleep(1)
-            print(".", end='')
-        elif datetime.now() >= next_launching:
-            print(" ")
-            print("Starting new sample...")
-            return
+    while time.time() < next_launching:
+        time.sleep(2)
+        print(".", end='')
 
 
-while True:
+    print(" ")
+    print("Starting new sample...")
+    return
+
+if __name__ == '__main__':
+
     start_time = datetime.now()
-    next_launching = start_time + timedelta(seconds=sampling_time)
-    RHT_data = CO2.getRHT()
-    CO2_data = CO2.getCO2P()
-    append_data_to_csv(start_time, RHT_data[0], RHT_data[1], CO2_data[2], CO2_data[0], CO2_data[1])
-    finish_time = datetime.now()
-    print("Sampling finished in", round(timedelta.total_seconds(finish_time - start_time), 0), "seconds")
-    wait_timestamp(start_time)
+    logger.info("------------------------------------")
+    log = "Launching a new execution on the " + str(start_time.strftime("%d/%m/%Y %H:%M:%S"))
+    logger.info(log)
+
+    PATH_CSV = "seacanairy.csv"
+
+    sampling_time = 60
+
+    while True:
+        start_time = datetime.now()
+        millis = time.time()
+        next_launching = start_time + timedelta(seconds=sampling_time)
+        RHT_data = CO2.getRHT()
+        CO2_data = CO2.getCO2P()
+
+        PM = OPCN3.getPM(5, 5)
+
+        append_data_to_csv(start_time, RHT_data[0], RHT_data[1], CO2_data[2], CO2_data[0], CO2_data[1], PM[0], PM[1], PM[2])
+        finish_time = time.time()
+        print("Sampling finished in", round(finish_time - millis, 0), "seconds")
+        wait_timestamp(millis)
