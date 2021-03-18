@@ -40,7 +40,7 @@ else:
     message_level = logging.INFO
     # If you run this code from another file (using this one as a library), it will only print INFO messages
 
-log_file = '/home/pi/seacanairy_project/log/CO2.log' # complete location needed on the RPI
+log_file = '/home/pi/seacanairy_project/log/seacanairy.log' # complete location needed on the RPI
 
 # set up logging to file - see previous section for more details
 logging.basicConfig(level=message_level,
@@ -62,6 +62,9 @@ logger = logging.getLogger('CO2 sensor')
 
 
 # --------------------------------------------------------
+
+def set_log_file(filepath):
+    log_file = filepath  # complete location needed on the RPI
 
 def digest(buf):
     """
