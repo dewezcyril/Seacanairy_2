@@ -11,7 +11,7 @@ import struct
 import datetime
 import sys
 import os.path
-import RPi.GPIO as GPIO
+# import RPi.GPIO as GPIO
 
 # --------------------------------------------------------
 # LOGGING SETTINGS
@@ -54,7 +54,7 @@ bus = 0  # name of the SPI bus on the Raspberry Pi 3B+
 device = 0  # name of the SS (Ship Selection) pin used for the OPC-N3
 spi = spidev.SpiDev()  # enable SPI
 spi.open(bus, device)
-spi.max_speed_hz = 500000  # 750 kHz
+spi.max_speed_hz = 400000  # 750 kHz
 spi.mode = 0b01  # bytes(0b01) = int(1) --> SPI mode 1
 # first bit (from right) = CPHA = 0 --> data are valid when clock is rising
 # second bit (from right) = CPOL = 0 --> clock is kept low when idle
@@ -63,10 +63,11 @@ wait_10_micro = 1e-06
 wait_reset_SPI_buffer = 3  # 3 seconds
 time_for_initiate_transmission = 30
 
+
 # CS (chip selection) manually via GPIO
-GPIO.setmode(GPIO.BCM)  # use the GPIO names (GPIO1...) instead of the processor pin name (BCM...)
-CS = 25
-GPIO.setup(CS, GPIO.OUT, initial=GPIO.HIGH)
+# GPIO.setmode(GPIO.BCM)  # use the GPIO names (GPIO1...) instead of the processor pin name (BCM...)
+# CS = 25
+# GPIO.setup(CS, GPIO.OUT, initial=GPIO.HIGH)
 
 
 def cs_high(delay=0.010):
@@ -103,7 +104,7 @@ def initiate_transmission(command_byte):
     stop = time.time() + time_for_initiate_transmission
 
     spi.open(0, 0)
-    cs_low()
+    # cs_low()
 
     while time.time() < stop:
         reading = spi.xfer([command_byte])  # initiate control of power state
@@ -135,15 +136,14 @@ def initiate_transmission(command_byte):
         if attempts > 60:
             log = "Failed 60 times to initiate control of power state, reset OPC-N3 SPI buffer"
             logger.critical(log)
-            cs_high()
+            # cs_high()
             time.sleep(wait_reset_SPI_buffer)  # time for spi buffer to reset
 
             log = "Trying again..."
             logger.info(log)
             attempts = 0  # reset the "SPI busy" loop
             cycle += 1  # increment of the SPI reset loop
-            cs_low()
-
+            # cs_low()
 
         if cycle >= 2:
             log = "Failed to initiate transmission (reset 3 times SPI, still error)"
@@ -168,7 +168,7 @@ def fan_off():
     while attempts < 4:
         if initiate_transmission(0x03):
             reading = spi.xfer([0x02])
-            cs_high()
+            # cs_high()
             spi.close()
             if reading == [0x03]:
                 print("Fan is OFF")
@@ -207,7 +207,7 @@ def fan_on():
     while attempts < 4:
         if initiate_transmission(0x03):
             reading = spi.xfer([0x03])
-            cs_high()
+            # cs_high()
             spi.close()
             time.sleep(0.6)  # wait > 600 ms to let the fan start
             if reading == [0x03]:
@@ -238,6 +238,7 @@ def fan_on():
 def laser_on():
     """
     Turn ON the laser of the OPC-N3.
+    :param: end_of_print_message: (optional) to concatenate the print messages on a same line on the console
     :return: TRUE
     """
     log = "Turn the laser ON"
@@ -247,7 +248,7 @@ def laser_on():
     while attempts < 4:
         if initiate_transmission(0x03):
             reading = spi.xfer([0x07])
-            cs_high()
+            # cs_high()
             spi.close()
             if reading == [0x03]:
                 print("Laser is ON")
@@ -286,7 +287,7 @@ def laser_off():
     while attempts < 4:
         if initiate_transmission(0x03):
             reading = spi.xfer([0x06])
-            cs_high()
+            # cs_high()
             spi.close()
             if reading == [0x03]:
                 print("Laser is OFF")
@@ -319,65 +320,59 @@ def read_DAC_power_status(item=None):
     :param item: 'fan', 'laser', fanDAC', 'laserDAC', 'laser_switch', 'gain', 'auto_gain_toggle'
     :return:
     """
-    attempts = 0
-    while attempts < 4:
-        if initiate_transmission(0x13):
-            response = spi.xfer([0x13, 0x13, 0x13, 0x13, 0x13, 0x13])
-            cs_high()
-            spi.close()
-            time.sleep(1)  # avoid too close communication
+    if initiate_transmission(0x13):
+        response = spi.xfer([0x13, 0x13, 0x13, 0x13, 0x13, 0x13])
+        # cs_high()
+        spi.close()
+        time.sleep(0.5)  # avoid too close communication
 
-            if item == 'fan':
-                log = "DAC power status for " + str(item) + " is " + str(response[0])
-                logger.debug(log)
-                return response[0]
-            elif item == 'laser':
-                log = "DAC power status for " + str(item) + " is " + str(response[1])
-                logger.debug(log)
-                return response[1]
-            elif item == 'fanDAC':
-                log = "DAC power status for " + str(item) + " is " + str(response[2])
-                logger.debug(log)
-                response = 1 - (response[2] / 255) * 100  # see documentation concerning fan pot
-                log = "Fan is running at " + str(response) + "% (0 = slow, 100 = fast)"
-                logger.info(log)
-                return response
-            elif item == 'laserDAC':
-                log = "DAC power status for " + str(item) + " is " + str(response[3])
-                logger.debug(log)
-                response = response[3] / 255 * 100  # see documentation concerning laser pot
-                log = "Laser is shining at " + str(response) + "%"
-                logger.debug(log)
-                return response
-            elif item == 'laser_switch':
-                log = "DAC power status for " + str(item) + " is " + str(response[4])
-                logger.debug(log)
-                return response[4]
-            elif item == 'gain':
-                response = response[5] & 0x01
-                log = "DAC power status for " + str(item) + " is " + str(response)
-                logger.debug(log)
-                return response
-            elif item == 'auto_gain_toggle':
-                response = response [5] & 0x02
-                log = "DAC power status for " + str(item) + " is " + str(response)
-                logger.debug(log)
-                return response
-            elif item is None:
-                log = "Full DAC power status is " + str(response)
-                logger.debug(log)
-                print(log)
-                return response
-            else:
-                raise ValueError("Argument of 'read_ADC_power_status' is unknown, check your code!")
-
+        if item == 'fan':
+            log = "DAC power status for " + str(item) + " is " + str(response[0])
+            logger.debug(log)
+            return response[0]
+        elif item == 'laser':
+            log = "DAC power status for " + str(item) + " is " + str(response[1])
+            logger.debug(log)
+            return response[1]
+        elif item == 'fanDAC':
+            log = "DAC power status for " + str(item) + " is " + str(response[2])
+            logger.debug(log)
+            response = 1 - (response[2] / 255) * 100  # see documentation concerning fan pot
+            log = "Fan is running at " + str(response) + "% (0 = slow, 100 = fast)"
+            logger.info(log)
+            return response
+        elif item == 'laserDAC':
+            log = "DAC power status for " + str(item) + " is " + str(response[3])
+            logger.debug(log)
+            response = response[3] / 255 * 100  # see documentation concerning laser pot
+            log = "Laser is shining at " + str(response) + "%"
+            logger.debug(log)
+            return response
+        elif item == 'laser_switch':
+            log = "DAC power status for " + str(item) + " is " + str(response[4])
+            logger.debug(log)
+            return response[4]
+        elif item == 'gain':
+            response = response[5] & 0x01
+            log = "DAC power status for " + str(item) + " is " + str(response)
+            logger.debug(log)
+            return response
+        elif item == 'auto_gain_toggle':
+            response = response[5] & 0x02
+            log = "DAC power status for " + str(item) + " is " + str(response)
+            logger.debug(log)
+            return response
+        elif item is None:
+            log = "Full DAC power status is " + str(response)
+            logger.debug(log)
+            print(log)
+            return response
         else:
-            attempts += 1
+            raise ValueError("Argument of 'read_ADC_power_status' is unknown, check your code!")
 
-        if attempts >= 3:
-            log = "Failed to read DAC power status"
-            logger.error(log)
-            break
+    else:
+        time.sleep(wait_reset_SPI_buffer + 1)
+        return 255
 
 
 def digest(data):
@@ -392,8 +387,8 @@ def digest(data):
                 crc ^= 0xA001
             else:
                 crc >>= 1
-    log = "Checksum is " + str(crc)
-    logger.debug(log)
+    # log = "Checksum is " + str(crc)
+    # logger.debug(log)
     return crc & 0xFFFF
 
 
@@ -417,79 +412,176 @@ def convert_IEEE754(value):
     return answer
 
 
-def PM_processing():
-    if initiate_transmission(0x32):
-        PM_A = spi.xfer([0x32, 0x32, 0x32, 0x32])
-        PM_B = spi.xfer([0x32, 0x32, 0x32, 0x32])
-        PM_C = spi.xfer([0x32, 0x32, 0x32, 0x32])
-        checksum = spi.xfer([0x32, 0x32])
-        time.sleep(1)  # avoid too close communication
+def PM_reading():
+    """
+    Read the PM bytes from the OPC-N3 sensor
+    Read the data and convert them in readable format, checksum enabled
+    Does neither start the fan nor start the laser
+    :return: List[PM 1, PM2.5, PM10]
+    """
+    attempts = 1
+    while attempts < 4:
+        if initiate_transmission(0x32):
+            PM_A = spi.xfer([0x32, 0x32, 0x32, 0x32])
+            PM_B = spi.xfer([0x32, 0x32, 0x32, 0x32])
+            PM_C = spi.xfer([0x32, 0x32, 0x32, 0x32])
+            checksum = spi.xfer([0x32, 0x32])
+            spi.close()
 
-        # print(PM_A)
-        # print(PM_B)
-        # print(PM_C)
+            PM1 = round(struct.unpack('f', bytes(PM_A))[0], 3)
+            PM25 = round(struct.unpack('f', bytes(PM_B))[0], 3)
+            PM10 = round(struct.unpack('f', bytes(PM_C))[0], 3)
 
-        PM1 = round(struct.unpack('f', bytes(PM_A))[0], 3)
-        PM25 = round(struct.unpack('f', bytes(PM_B))[0], 3)
-        PM10 = round(struct.unpack('f', bytes(PM_C))[0], 3)
+            if check(checksum, PM_A, PM_B, PM_C):
+                print("PM 1:", PM1, "mg/m3 | PM 2.5:", PM25, "mg/m3 | PM10:", PM10, "mg/m3")
+                time.sleep(0.5)  # avoid too close SPI communication
+                return [PM1, PM25, PM10]
+            if attempts >= 4:
+                log = "PM data wrong 3 consecutive times, skipping PM measurement"
+                logger.critical(log)
+                return [-255, -255, -255]
+            else:
+                attempts += 1
+                log = "Checksum for PM data is not correct, reading again (" + str(attempts) + "/3)"
+                logger.error(log)
+                time.sleep(0.5)  # avoid too close SPI communication
 
-        print("PM 1 is", PM1, "mg/m3")
-        print("PM 2,5 is", PM25, "mg/m3")
-        print("PM 10 is", PM10, "mg/m3")
-
-        check(checksum, PM_A, PM_B, PM_C)
-
-        return [PM1, PM25, PM10]
 
 def getPM(flushing, sampling_time):
-    fan_on()
-    time.sleep(flushing)
-    laser_on()
-    print("Launch PM")
-    PM_processing()
-    time.sleep(sampling_time)
-    print("Get PM")
-    PM = PM_processing()
+    """
+    Get PM measurement from OPC-N3
+    :param flushing: time (seconds) during which the fan runs alone to flush the sensor with fresh air
+    :param sampling_time: time (seconds) during which the laser reads the particulate matter in the air
+    :return: List[PM1, PM2.5, PM10]
+    """
+    try:
+        fan_on()
+        time.sleep(flushing)
+        laser_on()
+        print("Starting sampling")  # will be printed on the same line as "Laser is ON"
+        time.sleep(sampling_time)
+        PM = PM_reading()
 
-    laser_off()
-    fan_off()
+        laser_off()
+        fan_off()
+    except SystemExit or KeyboardInterrupt:  # to stop the laser and the fan in case of error or shutting down the program
+        laser_off()
+        fan_off()
+        raise
 
     return PM
 
-def read_histogram():
-    if initiate_transmission(0x30):
-        unused = spi.xfer([0x30] * 48)
-        MToF = spi.xfer([0x30] * 4)
-        sampling_period = spi.xfer([0x30] * 2)
-        sample_flow_rate = spi.xfer([0x30] * 2)
-        temperature = spi.xfer([0x30] * 2)
-        relative_humidity = spi.xfer([0x30] * 2)
-        PM_A = spi.xfer([0x30] * 4)
-        PM_B = spi.xfer([0x30] * 4)
-        PM_C = spi.xfer([0x30] * 4)
-        reject_count_glitch = spi.xfer([0x30] * 2)
-        reject_count_longTOF = spi.xfer([0x30] * 2)
-        reject_count_ratio = spi.xfer([0x30] * 2)
-        reject_count_Out_Of_Range = spi.xfer([0x30] * 2)
-        fan_rev_count = spi.xfer([0x30] * 2)
-        laser_status = spi.xfer([0x30] * 2)
-        checksum = spi.xfer([0x30] * 2)
-        print(unused)
-        print(MToF)
-        print(sampling_period)
-        print(sample_flow_rate)
-        print(temperature)
-        print(relative_humidity)
-        print(PM_A)
-        print(PM_B)
-        print(PM_C)
-        print(reject_count_glitch)
-        print(reject_count_longTOF)
-        print(reject_count_ratio)
-        print(reject_count_Out_Of_Range)
-        print(fan_rev_count)
-        print(laser_status)
-        print(checksum)
+
+def read_histogram(timestamp):
+    """
+    Read histogram of the OPC-N3
+    :param: flush: time (seconds) during while the fan is running
+    :return:
+    """
+    # Delete old histogram data and start a new one
+    attempts = 1
+    while True:
+        if initiate_transmission(0x30):
+            spi.xfer([0x30] * 86)
+            spi.close()
+            log = "Old histogram in the OPC-N3 deleted, starting a new one"
+            logger.debug(log)
+            break  # histogram measurement has been initiated, proceeding to
+        if attempts < 3:
+            attempts += 1
+            log = "Failed to initiate histogram, trying again (" + str(attempts) + "/3)"
+            logger.error(log)
+            time.sleep(wait_reset_SPI_buffer)
+        if attempts >= 3:
+            log = "Failed 3 times to initiate histogram, skipping this measurement"
+            logger.critical(log)
+            return
+
+    delay = timestamp * 2  # you must wait two times the timestamp in order that
+    # the sampling time given by the OPC-N3 respects your sampling time wishes
+    time.sleep(delay)  # sampling time of this histogram
+
+    attempts = 1  # reset the counter for next measurement
+    try:
+        while attempts < 4:
+            if initiate_transmission(0x30):
+                unused = spi.xfer([0x30] * 48)
+                MToF = spi.xfer([0x30] * 4)
+                sampling_period = spi.xfer([0x30] * 2)
+                sample_flow_rate = spi.xfer([0x30] * 2)
+                temperature = spi.xfer([0x30] * 2)
+                relative_humidity = spi.xfer([0x30] * 2)
+                PM_A = spi.xfer([0x30] * 4)
+                PM_B = spi.xfer([0x30] * 4)
+                PM_C = spi.xfer([0x30] * 4)
+                reject_count_glitch = spi.xfer([0x30] * 2)
+                reject_count_longTOF = spi.xfer([0x30] * 2)
+                reject_count_ratio = spi.xfer([0x30] * 2)
+                reject_count_Out_Of_Range = spi.xfer([0x30] * 2)
+                fan_rev_count = spi.xfer([0x30] * 2)
+                laser_status = spi.xfer([0x30] * 2)
+                checksum = spi.xfer([0x30] * 2)
+                spi.close()
+
+                if check(checksum, unused, MToF, sampling_period, sample_flow_rate, temperature, relative_humidity,
+                         PM_A, PM_B,
+                         PM_C, reject_count_glitch, reject_count_longTOF, reject_count_ratio, reject_count_Out_Of_Range,
+                         fan_rev_count, laser_status):
+                    # this means that the data are correct, they can be processed and printed
+                    PM1 = round(struct.unpack('f', bytes(PM_A))[0], 3)
+                    PM25 = round(struct.unpack('f', bytes(PM_B))[0], 3)
+                    PM10 = round(struct.unpack('f', bytes(PM_C))[0], 3)
+                    print("PM 1:", PM1, "mg/m3 | PM 2.5:", PM25, "mg/m3 | PM10:", PM10, "mg/m3")
+
+                    relative_humidity = round(100 * (join_bytes(relative_humidity) / (2 ** 16 - 1)), 2)
+                    temperature = round(-45 + 175 * (join_bytes(temperature) / (2 ** 16 - 1)), 2)  # conversion in °C
+                    print("Temperature:", temperature, "| Relative Humidity:", relative_humidity)
+
+                    sampling_period = join_bytes(sampling_period) / 100
+                    print("Sampling period:", sampling_period, "seconds")
+                    sample_flow_rate = join_bytes(sample_flow_rate) / 100
+                    print("Sampling flow rate:", sample_flow_rate, "ml/s |", round(sample_flow_rate * 60 / 1000, 2),
+                          "L/min")
+
+                    reject_count_glitch = join_bytes(reject_count_glitch)
+                    print("Reject count glitch:", reject_count_glitch)
+                    reject_count_longTOF = join_bytes(reject_count_longTOF)
+                    print("Reject count long TOF:", reject_count_longTOF)
+                    reject_count_ratio = join_bytes(reject_count_ratio)
+                    print("Reject count ratio:", reject_count_ratio)
+                    reject_count_Out_Of_Range = join_bytes(reject_count_Out_Of_Range)
+                    print("Reject count Out Of Range:", reject_count_Out_Of_Range)
+                    fan_rev_count = join_bytes(fan_rev_count)
+                    print("Fan revolutions count:", fan_rev_count)
+                    laser_status = join_bytes(laser_status)
+                    print("Laser status:", laser_status)
+
+                    print("MToF:", MToF)
+
+                    print("Unused bytes:")
+                    for i in range(0, 24):
+                        x = 2 * i
+                        y = x + 1
+                        answer = join_bytes(unused[x:y])
+                        print(answer, ", ", end='')
+                    print("")  # so that newt console printing will go to the next line
+                    return
+
+                else:
+                    log = "Checksum is wrong, trying again to read the histogram (" + str(attempts) + "/3)"
+                    logger.error(log)
+                    time.sleep(wait_reset_SPI_buffer)  # let some times between two SPI communications
+                    attempts += 1
+
+        if attempts >= 3:
+            log = "Checksum was wrong 3 times, skipping this histogram reading"
+            logger.critical(log)
+            return
+
+    except SystemExit or KeyboardInterrupt:  # to stop the laser and the fan in case of error or shutting down the program
+        laser_off()
+        fan_off()
+        raise
 
 
 def join_bytes(list_of_bytes):
@@ -688,14 +780,13 @@ def getmeasurement():
     ser.close()
     return
 
+
 if __name__ == '__main__':
     fan_on()
     time.sleep(2)
     laser_on()
 
-    PM_processing()
-    time.sleep(5)
-    PM = PM_processing()
+    read_histogram(5)
 
     laser_off()
     fan_off()
