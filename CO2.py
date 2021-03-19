@@ -34,18 +34,18 @@ import logging
 
 if __name__ == "__main__":
     message_level = logging.DEBUG
+    log_file = '/home/pi/seacanairy_project/log/CO2-debugging.log'  # complete location needed on the RPI
     # If you run the code from this file directly, it will show all the DEBUG messages
 
 else:
     message_level = logging.INFO
+    log_file = '/home/pi/seacanairy_project/log/seacanairy.log'  # complete location needed on the RPI
     # If you run this code from another file (using this one as a library), it will only print INFO messages
-
-log_file = '/home/pi/seacanairy_project/log/seacanairy.log' # complete location needed on the RPI
 
 # set up logging to file - see previous section for more details
 logging.basicConfig(level=message_level,
                     format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
-                    datefmt='%m-%d %H:%M',
+                    datefmt='%m-%d %H:%M:%S',
                     filename=log_file,
                     filemode='a')
 # define a Handler which writes INFO messages or higher to the sys.stderr/display
