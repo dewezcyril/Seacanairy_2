@@ -15,17 +15,10 @@ from datetime import date, datetime
 from smbus2 import SMBus, i2c_msg
 
 # I²C address of the CO2 device
-CO2_address: int = 0x33
+CO2_address = 0x33
 
 # emplacement variable
 bus = SMBus(1)
-
-# --------------------------------------------------------
-# CRC8 CHECKSUM CALCULATION
-# --------------------------------------------------------
-import crc8
-
-check = crc8.crc8()
 
 # --------------------------------------------------------
 # LOGGING SETTINGS
@@ -33,14 +26,23 @@ check = crc8.crc8()
 import logging
 
 if __name__ == "__main__":
-    message_level = logging.DEBUG
-    log_file = '/home/pi/seacanairy_project/log/CO2-debugging.log'  # complete location needed on the RPI
     # If you run the code from this file directly, it will show all the DEBUG messages
+    message_level = logging.DEBUG
+    log_file = '/home/pi/seacanairy_project/log/CO2-debug.log'  # complete location needed on the RPI
+    # define a Handler which writes INFO messages or higher to the sys.stderr/display
+    console = logging.StreamHandler()
+    console.setLevel(message_level)
+    # set a format which is simpler for console use
+    formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
+    # tell the handler to use this format
+    console.setFormatter(formatter)
+    # add the handler to the root logger
+    logging.getLogger().addHandler(console)
 
 else:
+    # If you run this code from another file (using this one as a library), it will only print INFO messages
     message_level = logging.INFO
     log_file = '/home/pi/seacanairy_project/log/seacanairy.log'  # complete location needed on the RPI
-    # If you run this code from another file (using this one as a library), it will only print INFO messages
 
 # set up logging to file - see previous section for more details
 logging.basicConfig(level=message_level,
@@ -48,23 +50,11 @@ logging.basicConfig(level=message_level,
                     datefmt='%m-%d %H:%M:%S',
                     filename=log_file,
                     filemode='a')
-# define a Handler which writes INFO messages or higher to the sys.stderr/display
-console = logging.StreamHandler()
-console.setLevel(message_level)
-# set a format which is simpler for console use
-formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
-# tell the handler to use this format
-console.setFormatter(formatter)
-# add the handler to the root logger
-logging.getLogger().addHandler(console)
 
 logger = logging.getLogger('CO2 sensor')
 
 
 # --------------------------------------------------------
-
-def set_log_file(filepath):
-    log_file = filepath  # complete location needed on the RPI
 
 def digest(buf):
     """
@@ -103,12 +93,10 @@ def check(checksum, data):
     """
     calculation = digest(data)
     if calculation == checksum:
-        log = "CRC8 is correct. Data are valid."
-        logger.debug(log)
+        logger.debug("CRC8 is correct, data are valid")
         return True
     else:
-        log = "CRC8 does not fit. Data are wrong"
-        logger.debug(log)
+        logger.debug("CRC8 does not fit, data are wrong")
         return False
 
 
@@ -125,8 +113,7 @@ def request_measurement():
 
     try:
         status = bus.read_byte_data(CO2_address, 0x71)
-        log = "Reading status on the CO2 sensor"
-        logger.debug(log)
+        logger.debug("Reading status on the CO2 sensor")
 
         if (status != 0):
             log = "CO2 sensor status is not ok. Value read is " + str(status)
@@ -154,8 +141,8 @@ def getRHT():
     write = i2c_msg.write(CO2_address, [0xE0, 0x00])
     read = i2c_msg.read(CO2_address, 6)
 
-    attempts = 0 # reset trial counter
-    reading_trials = 0 # reset trial counter
+    attempts = 0  # reset trial counter
+    reading_trials = 0  # reset trial counter
 
     while attempts < 4:
 
@@ -170,12 +157,10 @@ def getRHT():
                 if reading_trials == 3:
                     log = "RH and temperature lecture from CO2 sensor aborted. (3/3) i2c transmission problem."
                     logger.critical(log)
-                    return [-255, -255] # indicate on the SD card that data are wrong
+                    return [-255, -255]  # indicate on the SD card that data are wrong
                 reading_trials += 1  # increment of reading_trials
                 log = "Error in the i2c transmission. Trying again... (" + str(reading_trials + 1) + ")"
                 logger.error(log)
-
-
 
         reading = list(read)
         if check(reading[2], [reading[0], reading[1]]) and check(reading[5], [reading[3], reading[4]]):
@@ -202,7 +187,7 @@ def getRHT():
                 time.sleep(1)
 
         if attempts == 3:
-            return [-255, -255] # indicate on the SD card that data are wrong
+            return [-255, -255]  # indicate on the SD card that data are wrong
 
 
 def getCO2P():
@@ -220,7 +205,7 @@ def getCO2P():
     write = i2c_msg.write(CO2_address, [0xE0, 0x27])
     read = i2c_msg.read(CO2_address, 9)
 
-    attempts = 0 # reset trial counter
+    attempts = 0  # reset trial counter
     reading_trials = 0  # reset trial counter
 
     while attempts < 4:
@@ -242,17 +227,17 @@ def getCO2P():
                 logger.error(log)
                 reading_trials += 1  # increment of reading_trials
 
-
         reading = list(read)
-        if check(reading[2], [reading[0], reading[1]]) and check(reading[5], [reading[3], reading[4]]) and check(reading[8], [reading[6], reading[7]]):
-            CO2_average = (reading[0] << 8) + reading[1] # reading << 8 = shift bytes 8 times to the left
-            print ("CO2 average is:", CO2_average, "ppm")
+        if check(reading[2], [reading[0], reading[1]]) and check(reading[5], [reading[3], reading[4]]) and check(
+                reading[8], [reading[6], reading[7]]):
+            CO2_average = (reading[0] << 8) + reading[1]  # reading << 8 = shift bytes 8 times to the left
+            print("CO2 average is:", CO2_average, "ppm")
 
             CO2_raw = (reading[3] << 8) + reading[4]
             print("CO2 instant is:", CO2_raw, "ppm")
 
-            pressure = (((reading[6]) << 8) + reading[7]) / 10 # reading << 8 = shift bytes 8 times to the left
-            print("Pressure is:",  pressure, "mbar")
+            pressure = (((reading[6]) << 8) + reading[7]) / 10  # reading << 8 = shift bytes 8 times to the left
+            print("Pressure is:", pressure, "mbar")
 
             CO2_P = [CO2_average, CO2_raw, pressure]  # create a chain of values to be returned by the function
 
@@ -272,6 +257,62 @@ def getCO2P():
 # ---------------------------------------------------------------------
 # Settings
 # ---------------------------------------------------------------------
+
+def read_internal_timestamp():
+    write = i2c_msg.write(CO2_address, [0x71, 0x54, 0x00])
+    with SMBus(1) as bus:
+        bus.i2c_rdwr(write)
+    read = i2c_msg.read(CO2_address, 2)
+    with SMBus(1) as bus:
+        bus.i2c_rdwr(read)
+    reading = list(read)
+    print(reading)
+    measuring_time_interval = (reading[1] + reading[0] * 256) / 10
+    logger.info("Internal measuring time interval is " + str(measuring_time_interval) + " seconds")
+    print("Internal measuring time interval is " + str(measuring_time_interval) + " seconds")
+    return measuring_time_interval
+
+
+
+def set_internal_timestamp(sampling_timestamp):
+    if not 15 <= sampling_timestamp <= 3600:
+        raise TypeError("Sampling timestamp must be a number between 15 and 3600 seconds")
+    to_write = sampling_timestamp * 10
+    MSB_timestamp = (to_write & 0xFF00) >> 8
+    LSB_timestamp = (to_write & 0xFF)
+    index = 0x00
+    crc8 = digest([0x00, MSB_timestamp, LSB_timestamp])
+
+    attempts = 1
+
+    while attempts < 4:
+        try:
+            with SMBus(1) as bus:
+                write = i2c_msg.write(CO2_address, [0x71, 0x54, index, MSB_timestamp, LSB_timestamp, crc8])
+                bus.i2c_rdwr(write)
+                read = i2c_msg.read(CO2_address, 2)
+                bus.i2c_rdwr(read)
+                reading = list(read)
+                print(reading)
+                measuring_time_interval = (reading[1] + reading[0] * 256) / 10
+
+                if sampling_timestamp == measuring_time_interval:
+                    logger.info("Internal sensor timestamp is set on ", measuring_time_interval, " seconds")
+                    return measuring_time_interval
+
+                else:
+                    logger.error("Failed to change the internal timestamp, timestamp is set on " + str(measuring_time_interval) + " seconds")
+                    return measuring_time_interval
+
+        except:
+            if attempts == 3:
+                logger.error("Failed 3 consecutive times to update sensor internal timestamp")
+                return 0
+            else:
+                logger.error("Failed to update sensor internal timestamp (" + str(attempts) + "/3)")
+                attempts += 1
+                time.sleep(2)
+
 
 def set_time_interval(seconds):
     """
@@ -361,9 +402,13 @@ if __name__ == '__main__':
     log = "Launching a new execution on the " + str(now.strftime("%d/%m/%Y %H:%M:%S"))
     logger.info(log)
 
-    while (True):
-        getRHT()
-        time.sleep(1)
-        getCO2P()
-        print("waiting...")
-        time.sleep(20)  # wait 20 seconds
+    # while (True):
+    #     getRHT()
+    #     time.sleep(1)
+    #     getCO2P()
+    #     print("waiting...")
+    #     time.sleep(10)  # wait 20 seconds
+
+set_internal_timestamp(30)
+time.sleep(1)
+read_internal_timestamp()
