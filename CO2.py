@@ -285,6 +285,27 @@ def internal_timestamp(new_timestamp=None):
         return measuring_time_interval
 
 
+def trigger_measurement():
+    with SMBus(1) as bus:
+        reading = bus.read_byte_data(CO2_address, 0x71)
+    CO2 = reading & 0b00001000
+    temperature = reading & 0b00000010
+    humidity = reading & 0b00000001
+    print(reading)
+    if CO2 == 0:
+        logger.info("CO2 measurement is OK")
+    else:
+        logger.info("CO2 measurement is NOK")
+    if temperature == 0:
+        logger.info("Temperature measurement is OK")
+    else:
+        logger.info("Temperature measurement is NOK")
+    if humidity == 0:
+        logger.info("Humidity measurement is OK")
+    else:
+        logger.info("Humidity measurement is NOK")
+
+
 def read_internal_calibration(item):
     if item == 'relative humidity':
         index = 0x01
@@ -434,5 +455,4 @@ if __name__ == '__main__':
     #     print("waiting...")
     #     time.sleep(10)  # wait 20 seconds
 
-    read_internal_calibration('all')
-    internal_timestamp(60)
+    trigger_measurement()
