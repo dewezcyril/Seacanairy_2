@@ -285,6 +285,60 @@ def internal_timestamp(new_timestamp=None):
         return measuring_time_interval
 
 
+def read_internal_calibration(item):
+    if item == 'relative humidity':
+        index = 0x01
+        unit = "%RH"
+        factor = 1/100
+    elif item == 'temperature':
+        index = 0x02
+        unit = "Kelvin"
+        factor = 1/100
+    elif item == 'pressure':
+        index = 0x03
+        unit = "mbar"
+        factor = 1/10
+    elif item == 'CO2':
+        index = 0x04
+        unit = "ppm"
+        factor = 1
+    elif item == "all":
+        for i in ['relative humidity', 'temperature', 'pressure', 'CO2']:
+            read_internal_calibration(i)
+            time.sleep(0.5)
+        return
+    else:
+        raise TypeError("Argument of read_internal_calibration is wrong, must be: 'relative humidity', "
+                        "'temperature', 'pressure', 'CO2' or 'all'")
+
+    reading = read_from_custom_memory(index, 8)
+
+    if reading is False:
+        return  # avoid make any calculation below with a value which is False, would make an error
+    print(reading)
+    offset = (reading[0] << 8 + reading[1]) * factor
+    gain = (reading[2] << 8 + reading[3]) / 32768
+    lower_limit = (reading[4] << 8 + reading[5])  # factor taken into account further
+    upper_limit = (reading[6] << 8 + reading[7])  # factor taken into account further
+
+    logger.info("Reading calibration for " + str(item) + ":")
+    logger.info("\tOffset: " + str(offset) + " " + str(unit))
+    logger.info("\tGain: " + str(gain))
+    if lower_limit == 0xFFFF:
+        logger.info("\tNo last lower limit adjustment")
+        lower_limit = 0
+    else:
+        lower_limit += factor
+        logger.info("\tLower limit: " + str(lower_limit) + " " + str(unit))
+    if upper_limit == 0xFFFF:
+        logger.info("\tNo last upper minute adjustment")
+        upper_limit = 0
+    else:
+        upper_limit *= factor
+        logger.info("\tUpper limit: " + str(upper_limit) + " " + str(unit))
+    return [offset, gain, lower_limit, upper_limit]
+
+
 def read_from_custom_memory(index, number_of_bytes):
     """
     Read data from custom memory address in the CO2 sensor
@@ -294,7 +348,7 @@ def read_from_custom_memory(index, number_of_bytes):
     """
     logger.debug("Reading " + str(number_of_bytes) + " bytes from customer memory at index " + str(hex(index)) + "...")
     write = i2c_msg.write(CO2_address, [0x71, 0x54, index])
-    attempts = 0
+    attempts = 1
     while attempts < 4:
         try:
             with SMBus(1) as bus:
@@ -302,6 +356,7 @@ def read_from_custom_memory(index, number_of_bytes):
             read = i2c_msg.read(CO2_address, number_of_bytes)
             with SMBus(1) as bus:
                 bus.i2c_rdwr(read)
+                break  # break the trial loop
         except:
             if attempts >= 3:
                 logger.error("i2c communication failed 3 times while writing to customer memory, skipping reading")
@@ -349,7 +404,7 @@ def write_to_custom_memory(index, *bytes_to_write):
         cycle = 1  # reset the attempts counter, let the chance of the sensor to fail 3 i2c communication...
         # ...each time it fails the writing process
         if reading == [*bytes_to_write]:  # because reading returns a list
-            logger.info("Success in writing " + str(bytes_to_write) + " inside custom memory at index " + str(index))
+            logger.debug("Success in writing " + str(bytes_to_write) + " inside custom memory at index " + str(index))
             return reading  # indicate that the writing process succeeded
         if attempts >= 3:
             logger.critical("Failed 3 consecutive times to write " + str(bytes_to_write) +
@@ -379,4 +434,5 @@ if __name__ == '__main__':
     #     print("waiting...")
     #     time.sleep(10)  # wait 20 seconds
 
-    internal_timestamp(20)
+    read_internal_calibration('all')
+    internal_timestamp(60)
