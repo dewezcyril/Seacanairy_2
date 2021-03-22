@@ -29,20 +29,13 @@ if __name__ == "__main__":
     # If you run the code from this file directly, it will show all the DEBUG messages
     message_level = logging.DEBUG
     log_file = '/home/pi/seacanairy_project/log/CO2-debug.log'  # complete location needed on the RPI
-    # define a Handler which writes INFO messages or higher to the sys.stderr/display
-    console = logging.StreamHandler()
-    console.setLevel(message_level)
-    # set a format which is simpler for console use
-    formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
-    # tell the handler to use this format
-    console.setFormatter(formatter)
-    # add the handler to the root logger
-    logging.getLogger().addHandler(console)
+    print("CO2 running in DEBUG mode")
 
 else:
     # If you run this code from another file (using this one as a library), it will only print INFO messages
     message_level = logging.INFO
     log_file = '/home/pi/seacanairy_project/log/seacanairy.log'  # complete location needed on the RPI
+
 
 # set up logging to file - see previous section for more details
 logging.basicConfig(level=message_level,
@@ -53,6 +46,15 @@ logging.basicConfig(level=message_level,
 
 logger = logging.getLogger('CO2 sensor')
 
+# define a Handler which writes INFO messages or higher to the sys.stderr/display
+console = logging.StreamHandler()
+console.setLevel(message_level)
+# set a format which is simpler for console use
+formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
+# tell the handler to use this format
+console.setFormatter(formatter)
+# add the handler to the root logger
+logging.getLogger().addHandler(console)
 
 # --------------------------------------------------------
 
@@ -258,139 +260,107 @@ def getCO2P():
 # Settings
 # ---------------------------------------------------------------------
 
-def read_internal_timestamp():
-    write = i2c_msg.write(CO2_address, [0x71, 0x54, 0x00])
-    with SMBus(1) as bus:
-        bus.i2c_rdwr(write)
-    read = i2c_msg.read(CO2_address, 2)
-    with SMBus(1) as bus:
-        bus.i2c_rdwr(read)
-    reading = list(read)
-    print(reading)
-    measuring_time_interval = (reading[1] + reading[0] * 256) / 10
-    logger.info("Internal measuring time interval is " + str(measuring_time_interval) + " seconds")
-    print("Internal measuring time interval is " + str(measuring_time_interval) + " seconds")
-    return measuring_time_interval
+def internal_timestamp(new_timestamp=None):
+    """
+    Read/write the internal sampling timestamp of the CO2 sensor
+    :param new_timestamp: to change the timestamp, let empty to read tge timestamp
+    :return: internal sampling timestamp
+    """
+    if new_timestamp is not None:
+        if not 15 <= new_timestamp <= 3600:
+            raise TypeError("Sampling timestamp must be a number between 15 and 3600 seconds")
+        to_write = new_timestamp * 10
+        msb_timestamp = (to_write & 0xFF00) >> 8
+        lsb_timestamp = (to_write & 0xFF)
+        reading = write_to_custom_memory(0x00, msb_timestamp, lsb_timestamp)
+    else:
+        reading = read_from_custom_memory(0x00, 2)
+
+    if reading is not False:  # avoid to make calculation with a False value from above, which generate an error
+        measuring_time_interval = (reading[1] + reading[0] * 256) / 10
+        if new_timestamp is None:
+            logger.info("Internal measuring time interval is " + str(measuring_time_interval) + " seconds")
+        else:
+            logger.info("Internal measuring time interval set successfully on " + str(measuring_time_interval) + " seconds")
+        return measuring_time_interval
 
 
-
-def set_internal_timestamp(sampling_timestamp):
-    if not 15 <= sampling_timestamp <= 3600:
-        raise TypeError("Sampling timestamp must be a number between 15 and 3600 seconds")
-    to_write = sampling_timestamp * 10
-    MSB_timestamp = (to_write & 0xFF00) >> 8
-    LSB_timestamp = (to_write & 0xFF)
-    index = 0x00
-    crc8 = digest([0x00, MSB_timestamp, LSB_timestamp])
-
-    attempts = 1
-
+def read_from_custom_memory(index, number_of_bytes):
+    """
+    Read data from custom memory address in the CO2 sensor
+    :param index: index of the data to be read
+    :param number_of_bytes: number of bytes to read
+    :return: list[bytes] from right to left
+    """
+    logger.debug("Reading " + str(number_of_bytes) + " bytes from customer memory at index " + str(hex(index)) + "...")
+    write = i2c_msg.write(CO2_address, [0x71, 0x54, index])
+    attempts = 0
     while attempts < 4:
         try:
             with SMBus(1) as bus:
-                write = i2c_msg.write(CO2_address, [0x71, 0x54, index, MSB_timestamp, LSB_timestamp, crc8])
                 bus.i2c_rdwr(write)
-                read = i2c_msg.read(CO2_address, 2)
+            read = i2c_msg.read(CO2_address, number_of_bytes)
+            with SMBus(1) as bus:
                 bus.i2c_rdwr(read)
-                reading = list(read)
-                print(reading)
-                measuring_time_interval = (reading[1] + reading[0] * 256) / 10
-
-                if sampling_timestamp == measuring_time_interval:
-                    logger.info("Internal sensor timestamp is set on ", measuring_time_interval, " seconds")
-                    return measuring_time_interval
-
-                else:
-                    logger.error("Failed to change the internal timestamp, timestamp is set on " + str(measuring_time_interval) + " seconds")
-                    return measuring_time_interval
-
         except:
-            if attempts == 3:
-                logger.error("Failed 3 consecutive times to update sensor internal timestamp")
-                return 0
+            if attempts >= 3:
+                logger.error("i2c communication failed 3 times while writing to customer memory, skipping reading")
+                return False  # indicate that the writing process failed, exit this function
             else:
-                logger.error("Failed to update sensor internal timestamp (" + str(attempts) + "/3)")
+                logger.error("i2c communication failed to read from customer memory (" + str(attempts) + "/3)")
                 attempts += 1
-                time.sleep(2)
+                time.sleep(1)
+    reading = list(read)
+    logger.debug("Reading from custom memory returned " + str(reading))
+    return reading
 
 
-def set_time_interval(seconds):
+def write_to_custom_memory(index, *bytes_to_write):
     """
-    Def measurement timestamp for CO2 sensor
-    :param seconds: seconds
-    :return: 0 for success, 1 for error
+    Write data to a custom memory address in the CO2 sensor
+    :param index: index of the customer memory to write
+    :param bytes_to_write: infinite number of data to write at that place
+    :return: True (Success) or False (Fail)
     """
-    t = hex(seconds * 10)
-    while attempts < 3:
+    logger.debug("Writing " + str(bytes_to_write) + " inside custom memory at index "+ str(hex(index)) + "...")
+    crc8 = digest([index, *bytes_to_write])  # calculation of the CRC8 based on the index number and all the bytes sent
+    attempts = 1  # for writing into memory
+    cycle = 1  # for i2c communication
+
+    while cycle < 4 and attempts < 4:
         try:
-
-            digest()
-            log = "CRC8 calculation for timestamp change is " + str(checksum)
-            logger.debug(log)
-
-            write = i2c_msg.write(CO2_address, [0x71, 0x54, 0x00, t, checksum])
-
-            sleep()
-            reading = read(16)
-            set = (reading[0] << 8 + reading[1]) / 10
-            if int(set) == seconds:
-                log = "Measurement timestamp set successfully on " + str(set) + " seconds"
-                logger.info(log)
-                return 0
-            else:
-                log = "Failed to set measurement timestamp to " + str(set) + " seconds"
-                logger.error(log)
-                log = "Timestamp remains on " + str(set)
-                logger.error(log)
-                return 1
+            with SMBus(1) as bus:
+                write = i2c_msg.write(CO2_address, [0x71, 0x54, index, *bytes_to_write, crc8])
+                bus.i2c_rdwr(write)
+                logger.debug("i2c writing succeeded")
 
         except:
-            log = "Something went wrong with timestamp modification..."
-            logger.error(log)
-            return 1
+            if attempts >= 3:
+                logger.error("i2c communication failed 3 times while writing to customer memory, skipping writing")
+                return False  # indicate that the writing process failed, exit this function
+            else:
+                logger.error("i2c communication failed to write into customer memory (" + str(cycle) + "/3)")
+                cycle += 1
+                time.sleep(1)
 
-
-def write_calibration(calibration, offset, gain, lower_limit, upper_limit):
-    """
-    Read calibration settings of the sensor
-    :param calibration: 'relative humidity', 'temperature', 'pressure', or 'CO2'
-    :param offset:
-    :param gain:
-    :param lower_limit:
-    :param upper_limit:
-    :return: 0 if success, 1 if fail
-    """
-
-    if calibration == 'relative humidity':
-        index = 0x01
-
-    if calibration == 'temperature':
-        index = 0x02
-
-    if calibration == 'pressure':
-        index = 0x03
-
-    if calibration == 'CO2':
-        index = 0x04
-
-    else:
-        log = "The calibration command " + calibration + " is unknown"
-        logger.error(log)
-        pass  # don't send calibration information if calibration function is not recognized
-
-    GainValue = gain * 32768
-
-    check.update(hex(index))
-    check.update(hex(offset))
-    check.update(hex(GainValue))
-    check.update(hex(lower_limit))
-    check.update(hex(upper_limit))
-    checksum = check.hexdigest()
-
-    write([0x71, 0x54, index, GainValue, lower_limit, upper_limit, checksum])
-    # bus.write_i2c_block_data(CO2_address, 0x71, 0x54, index, GainValue, lower_limit, upper_limit, checksum)
-
-    # ........... still to do some things (reading, checking...)
+        # check that the data are written correctly
+        time.sleep(0.3)
+        reading = read_from_custom_memory(index, len(bytes_to_write))
+        cycle = 1  # reset the attempts counter, let the chance of the sensor to fail 3 i2c communication...
+        # ...each time it fails the writing process
+        if reading == [*bytes_to_write]:  # because reading returns a list
+            logger.info("Success in writing " + str(bytes_to_write) + " inside custom memory at index " + str(index))
+            return reading  # indicate that the writing process succeeded
+        if attempts >= 3:
+            logger.critical("Failed 3 consecutive times to write " + str(bytes_to_write) +
+                            " into customer memory at index " + str(hex(index)))
+            return False  # indicate that the writing process failed
+        else:
+            logger.error("Failed in writing " + str(bytes_to_write) + " inside custom memory at index " + str(hex(index))
+                         + " (" + str(attempts) + "/3), trying again")
+            logger.debug("Value read is " + str(reading) + " in place of " + str(bytes_to_write))
+            time.sleep(0.5)
+            attempts += 1
 
 
 # ---------------------------------------------------------------------
@@ -409,6 +379,4 @@ if __name__ == '__main__':
     #     print("waiting...")
     #     time.sleep(10)  # wait 20 seconds
 
-set_internal_timestamp(30)
-time.sleep(1)
-read_internal_timestamp()
+    internal_timestamp(20)
