@@ -201,6 +201,58 @@ def CO():
     return [COv_main, COv_aux]
 
 
+def getdata(average=None, interval=0.5):
+    """
+    Get all available data from the 4-AFE Alphasense Board
+    :param average: number of measurement to take to make average
+    :param interval: interval of time between those measurements
+    :return: List[temperature, NO2, OX, SO2, CO]
+    """
+    if average is not None:
+        temperature = []
+        NO2 = []
+        OX = []
+        SO2 = []
+        CO = []
+
+        for _ in range(average):
+            temperature.append(temp())
+            NO2.append(NO2())
+            OX.append(OX())
+            SO2.append(SO2())
+            CO.append(CO())
+            time.sleep(interval)
+        sum_temperature = 0
+        sum_NO2 = 0
+        sum_OX = 0
+        sum_SO2 = 0
+        sum_CO = 0
+        for i in range(average):
+            sum_temperature += temperature[i]
+            sum_NO2 += NO2[i]
+            sum_OX += OX[i]
+            sum_SO2 = SO2[i]
+            sum_CO = CO[i]
+
+        temperature = sum_temperature / average
+        NO2 = sum_NO2 / average
+        OX = sum_OX / average
+        SO2 = sum_SO2 / average
+        CO = sum_CO / average
+        return [temperature, NO2, OX, SO2, CO]
+
+    elif average is None:
+        temperature = temp()
+        NO2 = NO2()
+        OX = OX()
+        SO2 = SO2()
+        CO = CO()
+        return [temperature, NO2, OX, SO2, CO]
+
+    else:
+        raise TypeError("Arguments of the AFE function 'getdata' must be a number")
+
+
 # open the file where the data will be stored
 if __name__ == "__main__":
     # Execute an execution test if the script is executed from there
