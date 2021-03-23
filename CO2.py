@@ -262,13 +262,13 @@ def getCO2P():
 
 def internal_timestamp(new_timestamp=None):
     """
-    Read/write the internal sampling timestamp of the CO2 sensor
-    :param new_timestamp: to change the timestamp, let empty to read tge timestamp
-    :return: internal sampling timestamp
+    Read/write the internal sampling sampling_period of the CO2 sensor
+    :param new_timestamp: to change the sampling_period, let empty to read tge sampling_period
+    :return: internal sampling sampling_period
     """
     if new_timestamp is not None:
         if not 15 <= new_timestamp <= 3600:
-            raise TypeError("Sampling timestamp must be a number between 15 and 3600 seconds")
+            raise TypeError("Sampling sampling_period must be a number between 15 and 3600 seconds")
         to_write = new_timestamp * 10
         msb_timestamp = (to_write & 0xFF00) >> 8
         lsb_timestamp = (to_write & 0xFF)

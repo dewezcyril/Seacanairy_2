@@ -1,5 +1,6 @@
 """
-Software for the retrieve, storing and management of the Seacanairy 2
+Main Seacanairy Python Code that execute all the necessary functions to make the system work and take sample
+at required intervals
 """
 
 # import AFE
@@ -39,7 +40,7 @@ logger = logging.getLogger('SEACANAIRY')
 
 # ---------------------------------------
 
-timestamp = 60  # secs
+sampling_period = 60  # secs
 
 
 def append_data_to_csv(*data_to_write):
@@ -60,28 +61,29 @@ def append_data_to_csv(*data_to_write):
 
 def wait_timestamp(starting_time, finish_time):
     """
-    Wait that the timestamp is passed out to start the next measurement
+    Wait that the sampling period is passed out to start the next measurement
     :param starting_time: time at which the measurement has started
     :return: Function stop when next measurement can start
     """
-    next_launching = starting_time + timestamp
-    to_wait = round(timestamp - (finish_time - starting_time), 0)
+    next_launching = starting_time + sampling_period
+    to_wait = round(sampling_period - (finish_time - starting_time), 0)
     if finish_time >= next_launching:
-        log = "Measurement took more time than required (" + str(round(timestamp, 0)) + " seconds)"
+        log = "Measurement took more time than required (" + str(round(sampling_period, 0)) + " seconds)"
         logger.error(log)
         return
     while time.time() < next_launching:
         time.sleep(0.5)
         for i in range(0, int(to_wait)):
-            print("Waiting before next measurement: ", int(to_wait) - i, "seconds (sampling time is set on", timestamp,
+            print("Waiting before next measurement: ", int(to_wait) - i, "seconds (sampling time is set on", sampling_period,
                   "seconds)", end="\r")
             time.sleep(1)
     print("                                                                                    ")  # to go to next line
     print("Starting new sample...")
     return
 
-
-# if __name__ == '__main__':
+# --------------------------------------------
+# MAIN CODE
+# --------------------------------------------
 
 now = datetime.now()
 log = "Starting of Seacanairy on the " + str(now.strftime("%d/%m/%Y %H:%M:%S"))
@@ -89,7 +91,11 @@ logger.info(log)
 
 PATH_CSV = "seacanairy.csv"
 
-sampling_time = 60  # seconds
+if CO2.internal_timestamp() != sampling_period:
+    CO2.internal_timestamp(sampling_period)
+
+CO2.trigger_measurement()
+time.sleep(10)  # it needs around 10 seconds to make the measurement
 
 while True:
     now = datetime.now()

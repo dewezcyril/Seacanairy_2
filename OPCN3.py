@@ -508,7 +508,7 @@ def read_histogram(sampling_period):
             logger.critical(log)
             return
 
-    delay = sampling_period * 2  # you must wait two times the timestamp in order that
+    delay = sampling_period * 2  # you must wait two times the sampling_period in order that
     # the sampling time given by the OPC-N3 respects your sampling time wishes
     bar = IncrementalBar('Sampling', max=(2 * delay), suffix='%(elapsed)s/' + str(delay) + ' seconds')
     for i in range(0, 2 * delay):
