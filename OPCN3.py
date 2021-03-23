@@ -21,11 +21,6 @@ if __name__ == '__main__':
     # If you run the code from this file directly, it will show all the DEBUG messages
     message_level = logging.DEBUG
     log_file = '/home/pi/seacanairy_project/log/OPCN3-debug.log'
-
-else:
-    # If you run this code from another file (using this one as a library), it will only print INFO messages
-    message_level = logging.INFO
-    log_file = '/home/pi/seacanairy_project/log/seacanairy.log'
     # define a Handler which writes INFO messages or higher to the sys.stderr/display
     console = logging.StreamHandler()
     console.setLevel(message_level)
@@ -35,6 +30,11 @@ else:
     console.setFormatter(formatter)
     # add the handler to the root logger
     logging.getLogger().addHandler(console)
+
+else:
+    # If you run this code from another file (using this one as a library), it will only print INFO messages
+    message_level = logging.INFO
+    log_file = '/home/pi/seacanairy_project/log/seacanairy.log'
 
 
 # set up logging to file - see previous section for more details
@@ -60,8 +60,8 @@ spi.mode = 0b01  # bytes(0b01) = int(1) --> SPI mode 1
 # second bit (from right) = CPOL = 0 --> clock is kept low when idle
 wait_10_milli = 0.015  # 15 ms
 wait_10_micro = 1e-06
-wait_reset_SPI_buffer = 3  # 3 seconds
-time_for_initiate_transmission = 30
+wait_reset_SPI_buffer = 3  # seconds
+time_available_for_initiate_transmission = 10  # seconds
 
 
 # CS (chip selection) manually via GPIO
@@ -101,7 +101,7 @@ def initiate_transmission(command_byte):
     log = "Initiate transmission with command byte " + str(command_byte)
     logger.debug(log)
 
-    stop = time.time() + time_for_initiate_transmission
+    stop = time.time() + time_available_for_initiate_transmission
 
     spi.open(0, 0)
     # cs_low()
@@ -118,8 +118,8 @@ def initiate_transmission(command_byte):
             attempts += 1
 
         elif reading == [230] or reading == [99] or reading == [0]:
-            attempts += 2  # this is big error, if it occurs, then there are lot of chance if will not work anymore
-            log = "Problem with the SS (Slave Select) line (error code " + str(reading) + ")"
+            cycle += 1
+            log = "Problem with the SS (Slave Select) line (error code " + str(hex(reading[0])) + ")"
             logger.critical(log)
             log = "Check that SS line is well kept DOWN (0V) during transmission. " \
                   "Try again by connecting SS Line of sensor to Ground"
@@ -129,14 +129,14 @@ def initiate_transmission(command_byte):
             logger.info(log)
 
         else:
-            log = "Failed to initiate transmission (unexpected code returned: " + str(reading) + ")"
+            log = "Failed to initiate transmission (unexpected code returned: " + str(hex(reading[0])) + ")"
             logger.critical(log)
             time.sleep(1)  # wait 1e-05 before next command
             attempts += 1  # increment of attempts
 
         if attempts > 60:
             log = "Failed 60 times to initiate control of power state, reset OPC-N3 SPI buffer"
-            logger.critical(log)
+            logger.error(log)
             # cs_high()
             time.sleep(wait_reset_SPI_buffer)  # time for spi buffer to reset
 
@@ -152,7 +152,7 @@ def initiate_transmission(command_byte):
             return False  # function depending on initiate_transmission function will not continue
 
     if time.time() > stop:
-        log = "Transmission initiation took too much time (> " + str(time_for_initiate_transmission) + " secs)"
+        log = "Transmission initiation took too much time (> " + str(time_available_for_initiate_transmission) + " secs)"
         logger.critical(log)
         return False  # function depending on initiate_transmission function will not continue
 
@@ -377,6 +377,11 @@ def read_DAC_power_status(item=None):
 
 
 def digest(data):
+    """
+    Calculate the CRC8 Checksum
+    :param data: infinite number of bytes to use to calculate the checksum
+    :return: checksum
+    """
     crc = 0xFFFF
 
     for byteCtr in range(0, len(data)):
@@ -394,6 +399,12 @@ def digest(data):
 
 
 def check(checksum, *data):
+    """
+    Check that the data received are correct, based on those data and the checksum given
+    :param checksum: checksum sent by the sensor (the last byte)
+    :param data: all the other bytes sent by the sensor
+    :return:
+    """
     to_digest = []
     for i in data:
         to_digest.extend(i)
@@ -434,7 +445,7 @@ def PM_reading():
             PM10 = round(struct.unpack('f', bytes(PM_C))[0], 3)
 
             if check(checksum, PM_A, PM_B, PM_C):
-                print("PM 1:", PM1, "mg/m3 | PM 2.5:", PM25, "mg/m3 | PM10:", PM10, "mg/m3")
+                print("PM 1:", PM1, "mg/m3\t|\tPM 2.5:", PM25, "mg/m3\t|\tPM10:", PM10, "mg/m3")
                 time.sleep(0.5)  # avoid too close SPI communication
                 return [PM1, PM25, PM10]
             if attempts >= 4:
@@ -469,15 +480,14 @@ def getPM(flushing, sampling_time):
         laser_off()
         fan_off()
         raise
-
     return PM
 
 
-def read_histogram(timestamp):
+def read_histogram(sampling_period):
     """
-    Read histogram of the OPC-N3
+    Read all the data of the OPC-N3
     :param: flush: time (seconds) during while the fan is running
-    :return:
+    :return: List[PM1, PM25, PM10, temperature, relative_humidity]
     """
     # Delete old histogram data and start a new one
     attempts = 1
@@ -498,9 +508,9 @@ def read_histogram(timestamp):
             logger.critical(log)
             return
 
-    delay = timestamp * 2  # you must wait two times the timestamp in order that
+    delay = sampling_period * 2  # you must wait two times the timestamp in order that
     # the sampling time given by the OPC-N3 respects your sampling time wishes
-    bar = IncrementalBar('Sampling', max=(2 * delay), suffix='%(elapsed)s/'+ str(delay) + ' seconds')
+    bar = IncrementalBar('Sampling', max=(2 * delay), suffix='%(elapsed)s/' + str(delay) + ' seconds')
     for i in range(0, 2 * delay):
         time.sleep(0.5)
         bar.next()
@@ -513,7 +523,7 @@ def read_histogram(timestamp):
             if initiate_transmission(0x30):
                 unused = spi.xfer([0x30] * 48)
                 MToF = spi.xfer([0x30] * 4)
-                sampling_period = spi.xfer([0x30] * 2)
+                sampling_time = spi.xfer([0x30] * 2)
                 sample_flow_rate = spi.xfer([0x30] * 2)
                 temperature = spi.xfer([0x30] * 2)
                 relative_humidity = spi.xfer([0x30] * 2)
@@ -529,37 +539,38 @@ def read_histogram(timestamp):
                 checksum = spi.xfer([0x30] * 2)
                 spi.close()
 
-                if check(checksum, unused, MToF, sampling_period, sample_flow_rate, temperature, relative_humidity,
+                if check(checksum, unused, MToF, sampling_time, sample_flow_rate, temperature, relative_humidity,
                          PM_A, PM_B,
                          PM_C, reject_count_glitch, reject_count_longTOF, reject_count_ratio, reject_count_Out_Of_Range,
                          fan_rev_count, laser_status):
                     # this means that the data are correct, they can be processed and printed
-                    PM1 = round(struct.unpack('f', bytes(PM_A))[0], 3)
-                    PM25 = round(struct.unpack('f', bytes(PM_B))[0], 3)
-                    PM10 = round(struct.unpack('f', bytes(PM_C))[0], 3)
-                    print("PM 1:\t", PM1, "\t mg/m3")
-                    print("PM 2.5:\t", PM25, "\t mg/m3")
-                    print("PM 10:\t", PM10, "\t mg/m3")
+                    # rounding until 2 decimals, as this is the accuracy of the OPC-N3 for PM values
+                    PM1 = round(struct.unpack('f', bytes(PM_A))[0], 2)
+                    PM25 = round(struct.unpack('f', bytes(PM_B))[0], 2)
+                    PM10 = round(struct.unpack('f', bytes(PM_C))[0], 2)
+                    print("PM 1:\t", PM1, " mg/m3", end = "\t\t|\t")
+                    print("PM 2.5:\t", PM25, " mg/m3", end = "\t\t|\t")
+                    print("PM 10:\t", PM10, " mg/m3")
 
                     relative_humidity = round(100 * (join_bytes(relative_humidity) / (2 ** 16 - 1)), 2)
                     temperature = round(-45 + 175 * (join_bytes(temperature) / (2 ** 16 - 1)), 2)  # conversion in °C
-                    print("Temperature:", temperature, "| Relative Humidity:", relative_humidity)
+                    print("Temperature:", temperature, " °C (PCB Board)\t| \tRelative Humidity:", relative_humidity, " %RH (PCB Board)")
 
-                    sampling_period = join_bytes(sampling_period) / 100
-                    print(" Sampling period:", sampling_period, "seconds")
+                    sampling_time = join_bytes(sampling_time) / 100
+                    print(" Sampling period:", sampling_time, "seconds", end="\t\t|\t")
                     sample_flow_rate = join_bytes(sample_flow_rate) / 100
                     print(" Sampling flow rate:", sample_flow_rate, "ml/s |", round(sample_flow_rate * 60 / 1000, 2),"L/min")
 
                     reject_count_glitch = join_bytes(reject_count_glitch)
-                    print(" Reject count glitch:", reject_count_glitch)
+                    print(" Reject count glitch:", reject_count_glitch, end="\t\t|\t")
                     reject_count_longTOF = join_bytes(reject_count_longTOF)
                     print(" Reject count long TOF:", reject_count_longTOF)
                     reject_count_ratio = join_bytes(reject_count_ratio)
-                    print(" Reject count ratio:", reject_count_ratio)
+                    print(" Reject count ratio:", reject_count_ratio, end="\t\t|\t")
                     reject_count_Out_Of_Range = join_bytes(reject_count_Out_Of_Range)
                     print(" Reject count Out Of Range:", reject_count_Out_Of_Range)
                     fan_rev_count = join_bytes(fan_rev_count)
-                    print(" Fan revolutions count:", fan_rev_count)
+                    print(" Fan revolutions count:", fan_rev_count, end="\t\t|\t")
                     laser_status = join_bytes(laser_status)
                     print(" Laser status:", laser_status)
 
@@ -568,16 +579,19 @@ def read_histogram(timestamp):
                         x = 2 * i
                         y = x + 1
                         answer = join_bytes(unused[x:y])
-                        print(answer, "\t", end='')
+                        print(answer, end=", ")
                     print("")  # go to next line
                     print(" MToF:\t\t", end='')
                     for i in range(0, 4):
-                        print(MToF[i], "\t", end='')
+                        print(MToF[i], end=", ")
                     print("")  # go to next line
 
-                    if sampling_period > (timestamp + 0.5):  # we tolerate a difference of 0.5 seconds
-                        log = "Sampling period of the sensor was " + str(round(sampling_period - timestamp, 2)) + " seconds longer than expected"
+                    if sampling_time > (sampling_period + 0.5):  # we tolerate a difference of 0.5 seconds
+                        log = "Sampling period of the sensor was " + str(round(sampling_time - sampling_period, 2)) + " seconds longer than expected"
                         logger.info(log)
+
+                    elif sampling_time < (sampling_period - 0.5):
+                        logger.info("Sampling period of the sensor was " + str(round(sampling_period - sampling_time, 2)) + " seconds shorter than expected")
 
                     return [PM1, PM25, PM10, temperature, relative_humidity]
 
@@ -601,10 +615,17 @@ def read_histogram(timestamp):
 
 
 def getdata(flushing_time, sampling_time):
+    """
+    Get all the possible data from the OPC-N3 sensor
+    :param flushing_time: time during which the ventilator is running, without laser, no sampling
+    :param sampling_time: time during which the sensor is sampling
+    :return: List[PM1, PM25, PM10, temperature, relative_humidity]
+    """
     data = [-255, -255, -255, -255, -255]
     if fan_on():
-        time.sleep(flushing_time)
+        time.sleep(flushing_time/2)
         if laser_on():
+            time.sleep(flushing_time/2)
             data = read_histogram(sampling_time)
         laser_off()
     fan_off()

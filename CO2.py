@@ -25,11 +25,20 @@ bus = SMBus(1)
 # --------------------------------------------------------
 import logging
 
-if __name__ == "__main__":
+if __name__ != "CO2":
     # If you run the code from this file directly, it will show all the DEBUG messages
     message_level = logging.DEBUG
     log_file = '/home/pi/seacanairy_project/log/CO2-debug.log'  # complete location needed on the RPI
     print("CO2 running in DEBUG mode")
+    # define a Handler which writes INFO messages or higher to the sys.stderr/display
+    console = logging.StreamHandler()
+    console.setLevel(message_level)
+    # set a format which is simpler for console use
+    formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
+    # tell the handler to use this format
+    console.setFormatter(formatter)
+    # add the handler to the root logger
+    logging.getLogger().addHandler(console)
 
 else:
     # If you run this code from another file (using this one as a library), it will only print INFO messages
@@ -46,15 +55,6 @@ logging.basicConfig(level=message_level,
 
 logger = logging.getLogger('CO2 sensor')
 
-# define a Handler which writes INFO messages or higher to the sys.stderr/display
-console = logging.StreamHandler()
-console.setLevel(message_level)
-# set a format which is simpler for console use
-formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
-# tell the handler to use this format
-console.setFormatter(formatter)
-# add the handler to the root logger
-logging.getLogger().addHandler(console)
 
 # --------------------------------------------------------
 
@@ -170,8 +170,8 @@ def getRHT():
             temperature = round(((reading[0] << 8) + reading[1]) / 100 - 273.15, 2)
             relative_humidity = ((reading[3] << 8) + reading[4]) / 100
 
-            print("Temperature from CO2 sensor is:", temperature, "°C")
-            print("Relative humidity from CO2 sensor is:", relative_humidity, "%RH")
+            print("Temperature is:", temperature, "°C", end="")
+            print("\t| Relative humidity is:", relative_humidity, "%RH")
 
             RH_T = [relative_humidity, temperature]  # create a chain of values to be returned by the function
 
@@ -232,14 +232,14 @@ def getCO2P():
         reading = list(read)
         if check(reading[2], [reading[0], reading[1]]) and check(reading[5], [reading[3], reading[4]]) and check(
                 reading[8], [reading[6], reading[7]]):
-            CO2_average = (reading[0] << 8) + reading[1]  # reading << 8 = shift bytes 8 times to the left
-            print("CO2 average is:", CO2_average, "ppm")
-
-            CO2_raw = (reading[3] << 8) + reading[4]
-            print("CO2 instant is:", CO2_raw, "ppm")
-
             pressure = (((reading[6]) << 8) + reading[7]) / 10  # reading << 8 = shift bytes 8 times to the left
             print("Pressure is:", pressure, "mbar")
+
+            CO2_average = (reading[0] << 8) + reading[1]  # reading << 8 = shift bytes 8 times to the left
+            print("CO2 average is:", CO2_average, "ppm", end="")
+
+            CO2_raw = (reading[3] << 8) + reading[4]
+            print("\t\t| CO2 instant is:", CO2_raw, "ppm")
 
             CO2_P = [CO2_average, CO2_raw, pressure]  # create a chain of values to be returned by the function
 
@@ -455,4 +455,4 @@ if __name__ == '__main__':
     #     print("waiting...")
     #     time.sleep(10)  # wait 20 seconds
 
-    trigger_measurement()
+    internal_timestamp()
