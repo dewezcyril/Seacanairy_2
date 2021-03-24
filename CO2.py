@@ -49,7 +49,7 @@ else:
 # set up logging to file - see previous section for more details
 logging.basicConfig(level=message_level,
                     format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
-                    datefmt='%m-%d %H:%M:%S',
+                    datefmt='%d-%m %H:%M:%S',
                     filename=log_file,
                     filemode='a')
 
@@ -304,6 +304,13 @@ def trigger_measurement():
         logger.info("Humidity measurement is OK")
     else:
         logger.info("Humidity measurement is NOK")
+
+
+def status():
+    """
+    Read the status byte of the CO2 sensor
+    :return: List[CO2 status, temperature status, humidity status]
+    """
 
 
 def read_internal_calibration(item):

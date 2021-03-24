@@ -40,7 +40,7 @@ else:
 # set up logging to file - see previous section for more details
 logging.basicConfig(level=message_level,
                     format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
-                    datefmt='%m-%d %H:%M:%S',
+                    datefmt='%d-%m %H:%M:%S',
                     filename=log_file,
                     filemode='a')
 

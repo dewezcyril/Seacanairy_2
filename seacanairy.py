@@ -3,7 +3,7 @@ Main Seacanairy Python Code that execute all the necessary functions to make the
 at required intervals
 """
 
-# import AFE
+# import libraries
 import CO2
 import OPCN3
 import time
@@ -23,7 +23,7 @@ message_level = logging.INFO
 # set up logging to file - see previous section for more details
 logging.basicConfig(level=message_level,
                     format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
-                    datefmt='%m-%d %H:%M:%S',
+                    datefmt='%d-%m %H:%M:%S',
                     filename=log_file,
                     filemode='a')
 # define a Handler which writes INFO messages or higher to the sys.stderr/display
@@ -85,6 +85,7 @@ def wait_timestamp(starting_time, finish_time):
 # MAIN CODE
 # --------------------------------------------
 
+
 now = datetime.now()
 log = "Starting of Seacanairy on the " + str(now.strftime("%d/%m/%Y %H:%M:%S"))
 logger.info(log)
@@ -101,11 +102,11 @@ while True:
     now = datetime.now()
 
     start = time.time()
-    print("***** CO2 SENSOR *****")
+    print("********* CO2 SENSOR *********")
     RHT_data = CO2.getRHT()
     CO2_data = CO2.getCO2P()
-    print("***** OPC-N3 *****")
-    OPC = OPCN3.getdata(1, 5)
+    print("********* OPC-N3 *********")
+    OPC = OPCN3.getdata(2, 5)
 
     print("  ")
     # date/time, RH, temperature, pressure, CO2 average, CO2 instant, PM1, PM25, PM10, temperature, relative_humidity
