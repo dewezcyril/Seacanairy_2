@@ -138,7 +138,7 @@ def initiate_transmission(command_byte):
             return False
 
         else:
-            logger.critical("Failed to initiate transmission (unexpected code returned: " + str(hex(reading[0])) + ")")
+            logger.critical("Failed to initiate transmission (unexpected code returned: " + str(hex(reading[0])) + ") (" + str(cycle) + "/3)")
             time.sleep(1)  # wait 1e-05 before next command
             cycle += 1  # increment of attempts
 
