@@ -1,7 +1,5 @@
 """
 Libraries for the use of E+E Elektronik EE894 CO2 sensor via I²C communication
-
-Execution at the end of the functions written above
 """
 # --------------------------------------------------------
 # USEFUL VARIABLES
@@ -14,22 +12,32 @@ from datetime import date, datetime
 # smbus2 is the new smbus, allow more than 32 bits writing/reading
 from smbus2 import SMBus, i2c_msg
 
+# 'SMBus' is the general driver for i2c communication
+# 'i2c_msg' allow to make i2c write followed by i2c read WITHOUT any STOP byte (see sensor documentation)
+
 # I²C address of the CO2 device
-CO2_address = 0x33
+CO2_address = 0x33  # i2c address by default, can be changed (see sensor doc)
 
 # emplacement variable
-bus = SMBus(1)
+bus = SMBus(1)  # make it easier to read/write to the sensor (bus.read or bus.write...)
 
 # --------------------------------------------------------
 # LOGGING SETTINGS
 # --------------------------------------------------------
+# all the settings and other code for the logging
+# logging = tak a trace of some messages in a file to be reviewed afterward (check for errors fe)
+
 import logging
 
-if __name__ != "CO2":
-    # If you run the code from this file directly, it will show all the DEBUG messages
-    message_level = logging.DEBUG
-    log_file = '/home/pi/seacanairy_project/log/CO2-debug.log'  # complete location needed on the RPI
-    print("CO2 running in DEBUG mode")
+if __name__ == '__main__':  # if you run this code directly ($ python3 CO2.py)
+    message_level = logging.DEBUG  # show ALL the logging messages
+    log_file = '/home/pi/seacanairy_project/log/CO2-debug.log'  # complete file location required for the Raspberry
+    print("DEBUG messages will be shown and stored in '" + str(log_file) +"'")
+
+    # The following HANDLER must be activated ONLY if you run this code alone
+    # Without the 'if __name__ == '__main__' condition, all the logging messages are displayed 3 TIMES
+    # (once for the handler in CO2.py, once for the handler in OPCN3.py, and once for the handler in seacanairy.py)
+
     # define a Handler which writes INFO messages or higher to the sys.stderr/display
     console = logging.StreamHandler()
     console.setLevel(message_level)
@@ -40,28 +48,31 @@ if __name__ != "CO2":
     # add the handler to the root logger
     logging.getLogger().addHandler(console)
 
-else:
-    # If you run this code from another file (using this one as a library), it will only print INFO messages
+else:  # if this file is considered as a library (if you execute seacanairy.py for example)
+    # it will only print and store INFO messages in the corresponding log_file
     message_level = logging.INFO
     log_file = '/home/pi/seacanairy_project/log/seacanairy.log'  # complete location needed on the RPI
 
+    # no need to add a handler, because there is already one in seacanairy.py
 
-# set up logging to file - see previous section for more details
+# set up logging to file
 logging.basicConfig(level=message_level,
                     format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
                     datefmt='%d-%m %H:%M:%S',
                     filename=log_file,
                     filemode='a')
 
-logger = logging.getLogger('CO2 sensor')
-
+logger = logging.getLogger('CO2 sensor')  # name of the logger
+# all further logging must be called by logger.'level' and not logging.'level'
+# if not, the logging will be displayed as ROOT and NOT 'CO2 sensor'
 
 # --------------------------------------------------------
 
+
 def digest(buf):
     """
-    Digest the data to return the corresponding checksum
-    :param buf: List of data to digest
+    Calculate the CRC8 checksum (based on the CO2 documentation example)
+    :param buf: List[bytes to digest]
     :return: checksum
     """
     # Translation of the C++ code given in the documentation
@@ -88,8 +99,8 @@ def digest(buf):
 
 def check(checksum, data):
     """
-    Check that the data transmitted are correct using the data and the checksum
-    :param data: List containing the data to be digested (see sensor doc)
+    Check that the data transmitted are correct using the data and the given checksum
+    :param data: List[bytes to be used in the checksum calculation (see sensor doc)]
     :param checksum: Checksum given by the sensor
     :return:
     """
@@ -105,8 +116,9 @@ def check(checksum, data):
 def request_measurement():
     """
     Request a new measurement to the sensor if the previous one is older than 10 seconds.
-
-    :return:  1 if status of the sensor is OK
+    Reset the internal counter (after the execution of this function, the sensor will wait for the amount of time
+    defined as the internal timestamp before taking the next measurement)
+    :return:  status given by the sensor
     """
 
     # In the settings of the sensor, the firmware automatically make measurement every x seconds
@@ -126,7 +138,7 @@ def request_measurement():
     except:
         log = "Error while reading status of CO2 sensor via I²C"
         logger.error(log)
-        return 0
+        return 255  # indicate that all the bytes are 1 (0b11111111)
 
 
 def getRHT():
@@ -135,38 +147,42 @@ def getRHT():
         CO2_get_RH_T()[0] = relative humidity
         CO2_get_RH_T()[1] = temperature
 
-    :return:  List of int[Relative Humidity (%RH), Temperature (°C)]
+    :return:  List[Relative Humidity (%RH), Temperature (°C)]
     """
     log = "Reading RH and Temperature from CO2 sensor"
     logger.debug(log)
 
-    write = i2c_msg.write(CO2_address, [0xE0, 0x00])
+    write = i2c_msg.write(CO2_address, [0xE0, 0x00])  # see documentation, example for reading t° and RH
     read = i2c_msg.read(CO2_address, 6)
 
-    attempts = 0  # reset trial counter
-    reading_trials = 0  # reset trial counter
+    attempts = 0  # trial counter for the checksum and the validity of the data received
+    reading_trials = 0  # trial counter for the i2c communication
 
+    # all the following code is in a loop so that if the checksum is wrong, it start a new measurement
     while attempts < 4:
 
-        while reading_trials < 4:
-            try:
-                time.sleep(1)  # if transmission fails, wait a bit to try again
+        while reading_trials < 4:  # reading loop, will try again if the i2c communication fails
+            try:  # SMBUS stop working in case of error, avoid the software to crash in case of i2c error
                 with SMBus(1) as bus:
                     bus.i2c_rdwr(write, read)
-                break  # break the loop if the try has not failed at the previous line
+                break  # break the loop if the try has not failed at the previous line, jump to the process of data
 
-            except:
+            except:  # what happens if the i2c fails
                 if reading_trials == 3:
                     log = "RH and temperature lecture from CO2 sensor aborted. (3/3) i2c transmission problem."
                     logger.critical(log)
-                    return [-255, -255]  # indicate on the SD card that data are wrong
-                reading_trials += 1  # increment of reading_trials
-                log = "Error in the i2c transmission. Trying again... (" + str(reading_trials + 1) + ")"
-                logger.error(log)
+                    return [-255, -255]  # indicate clearly that data are wrong
 
+                log = "Error in the i2c transmission, trying again... (" + str(reading_trials + 1) + ")"
+                logger.error(log)
+                reading_trials += 1  # increment of reading_trials
+                time.sleep(2)  # if transmission fails, wait a bit to try again (sensor is maybe busy)
+
+        # process the data given by the sensor
         reading = list(read)
+        # if the two checksums are correct...
         if check(reading[2], [reading[0], reading[1]]) and check(reading[5], [reading[3], reading[4]]):
-            # reading << 8 = shift bytes 8 times to the left, equally, add 8 times 0 on the right
+            # reading << 8 = shift bytes 8 times to the left, say differently, add 8 times 0 on the right
             temperature = round(((reading[0] << 8) + reading[1]) / 100 - 273.15, 2)
             relative_humidity = ((reading[3] << 8) + reading[4]) / 100
 
@@ -177,19 +193,15 @@ def getRHT():
 
             return RH_T
 
-        else:
-            attempts += 1
+        else:  # if one or both checksums are not corrects
             if attempts == 3:
-                log = "Error in the data received. (3/3) Temperature and humidity reading aborted"
-                logger.error(log)
+                logger.error("Error in the data received (3/3), temperature and humidity reading skipped")
                 return [-255, -255]  # indicate on the SD card that data are wrong
-            else:
-                log = "Error in the data received. Reading data again... (" + str(attempts) + "/3)"
-                logger.error(log)
-                time.sleep(1)
 
-        if attempts == 3:
-            return [-255, -255]  # indicate on the SD card that data are wrong
+            else:
+                attempts += 1
+                logger.warning("Error in the data received, trying again... (" + str(attempts) + "/3)")
+                time.sleep(1)  # avoid to close i2c communication
 
 
 def getCO2P():
@@ -199,37 +211,37 @@ def getCO2P():
         CO2_get_CO2_P()[1] = CO2_raw
         CO2_get_CO2_P()[2] = pressure
 
-    :return: List of int[CO2 (average), CO2 (instant measurement), Atmospheric Pressure)
+    :return: List[CO2 (average), CO2 (instant measurement), Atmospheric Pressure)
     """
-    log = 'Reading of CO2 and pressure'
-    logger.debug(log)
+    logger.debug('Reading of CO2 and pressure')
 
-    write = i2c_msg.write(CO2_address, [0xE0, 0x27])
+    write = i2c_msg.write(CO2_address, [0xE0, 0x27])  # see documentation, reading of CO2 and pressure example
     read = i2c_msg.read(CO2_address, 9)
 
-    attempts = 0  # reset trial counter
-    reading_trials = 0  # reset trial counter
+    attempts = 0  # trial counter for the checksum and the validity of the data received
+    reading_trials = 0  # trial counter for the i2c communication
 
+    # all the following code is in a loop so that if the checksum is wrong, it start a new measurement
     while attempts < 4:
 
-        while reading_trials < 4:
-            try:
-                time.sleep(1)  # if I²C comm fails, wait a little bit before the next reading (this is a general
-                # recommendation concerning I²C comm)
+        while reading_trials < 4:  # reading loop, will try again if the i2c communication fails
+            try:  # SMBUS stop working in case of error, avoid the software to crash in case of i2c error
                 with SMBus(1) as bus:
                     bus.i2c_rdwr(write, read)
-                break  # break the loop if the try has not failed at the previous line
+                break  # break the loop if the try has not failed at the previous line, jump to the process of data
 
-            except:
+            except:  # what happens if the i2c fails
                 if reading_trials == 3:
-                    log = "RH and temperature lecture from CO2 sensor aborted. i2c transmission problem."
-                    logger.critical(log)
-                    return [-255, -255, -255]  # indicate that the data are wrong
-                log = "Error in the i2c transmission. Trying again... (" + str(reading_trials + 1) + "/3)"
-                logger.error(log)
-                reading_trials += 1  # increment of reading_trials
+                    logger.critical("RH and temperature lecture from CO2 sensor aborted. i2c transmission problem.")
+                    return [-255, -255, -255]  # indicate clearly that the data are wrong
 
+                logger.error("Error in the i2c transmission, trying again... (" + str(reading_trials + 1) + "/3)")
+                reading_trials += 1  # increment of reading_trials
+                time.sleep(1)  # if I²C comm fails, wait a little bit and try again (sensor is maybe busy)
+
+        # process the data given by the sensor
         reading = list(read)
+        # if the two checksums are correct...
         if check(reading[2], [reading[0], reading[1]]) and check(reading[5], [reading[3], reading[4]]) and check(
                 reading[8], [reading[6], reading[7]]):
             pressure = (((reading[6]) << 8) + reading[7]) / 10  # reading << 8 = shift bytes 8 times to the left
@@ -245,15 +257,15 @@ def getCO2P():
 
             return CO2_P
 
-        else:
-            attempts += 1
+        else:  # if one or both checksums are not corrects
             if attempts == 3:
-                log = "Error in the data received. CO2 and pressure reading aborted"
-                logger.error(log)
-                return [-255, -255, -255]  # indicate that the data are wrong
+                logger.error("Error in the data received. CO2 and pressure reading aborted")
+                return [-255, -255, -255]  # indicate clearly that the data are wrong
+
             else:
-                log = "Error in the data received. Reading data again... (" + str(attempts) + "/3)"
-                logger.error(log)
+                attempts += 1
+                logger.warning("Error in the data received. Reading data again... (" + str(attempts) + "/3)")
+                time.sleep(1)  # avoid too close i2c communication
 
 
 # ---------------------------------------------------------------------
@@ -262,87 +274,110 @@ def getCO2P():
 
 def internal_timestamp(new_timestamp=None):
     """
-    Read/write the internal sampling sampling_period of the CO2 sensor
-    :param new_timestamp: to change the sampling_period, let empty to read tge sampling_period
-    :return: internal sampling sampling_period
+    Read the internal sampling period of the CO2 sensor
+    To change the value, write it between the brackets (in seconds)
+    :param new_timestamp: None to read, new value in seconds to change it
+    :return: internal sampling period of the sensor
     """
-    if new_timestamp is not None:
+    if new_timestamp is not None:  # if user write something as input in the brackets (arguments)
         if not 15 <= new_timestamp <= 3600:
-            raise TypeError("Sampling sampling_period must be a number between 15 and 3600 seconds")
-        to_write = new_timestamp * 10
+            logger.warning("Sampling period should be a number between 15 and 3600 seconds (see sensor documentation)")
+        to_write = new_timestamp * 10  # see sensor documentation
         msb_timestamp = (to_write & 0xFF00) >> 8
         lsb_timestamp = (to_write & 0xFF)
         reading = write_to_custom_memory(0x00, msb_timestamp, lsb_timestamp)
-    else:
+    else:  # if user doesn't write anything between the brackets
         reading = read_from_custom_memory(0x00, 2)
 
-    if reading is not False:  # avoid to make calculation with a False value from above, which generate an error
+    if reading is not False:  # read_from_custom_memory() returns False in case of error...
+        # ...Python crash if it tries to make calculations with a boolean (True or False)
         measuring_time_interval = (reading[1] + reading[0] * 256) / 10
-        if new_timestamp is None:
+        if new_timestamp is None:  # adapt the message in function of the wishes of the user (here he want to read)
             logger.info("Internal measuring time interval is " + str(measuring_time_interval) + " seconds")
-        else:
-            logger.info("Internal measuring time interval set successfully on " + str(measuring_time_interval) + " seconds")
+        else:  # (here he want to write)
+            logger.info(
+                "Internal measuring time interval set successfully on " + str(measuring_time_interval) + " seconds")
         return measuring_time_interval
 
 
-def trigger_measurement():
-    with SMBus(1) as bus:
-        reading = bus.read_byte_data(CO2_address, 0x71)
-    CO2 = reading & 0b00001000
-    temperature = reading & 0b00000010
-    humidity = reading & 0b00000001
-    print(reading)
-    if CO2 == 0:
-        logger.info("CO2 measurement is OK")
-    else:
-        logger.info("CO2 measurement is NOK")
-    if temperature == 0:
-        logger.info("Temperature measurement is OK")
-    else:
-        logger.info("Temperature measurement is NOK")
-    if humidity == 0:
-        logger.info("Humidity measurement is OK")
-    else:
-        logger.info("Humidity measurement is NOK")
-
-
-def status():
+def status(print_information=True):
     """
     Read the status byte of the CO2 sensor
+    !! Will trigger a new measurement if the previous one is older than 10 seconds
+    :param: print_information: Optional: False to hide the messages
     :return: List[CO2 status, temperature status, humidity status]
     """
+    with SMBus(1) as bus:
+        reading = bus.read_byte_data(CO2_address, 0x71)
+    # see documentation for the following decryption
+    CO2_status = reading & 0b00001000
+    temperature_status = reading & 0b00000010
+    humidity_status = reading & 0b00000001
+    if print_information:  # if user/software indicate to print the information
+        if CO2_status == 0:
+            logger.info("CO2 measurement is OK")
+        else:
+            logger.warning("CO2 measurement is NOK")
+        if temperature_status == 0:
+            logger.info("Temperature measurement is OK")
+        else:
+            logger.warning("Temperature measurement is NOK")
+        if humidity_status == 0:
+            logger.info("Humidity measurement is OK")
+        else:
+            logger.warning("Humidity measurement is NOK")
+    return [CO2_status, temperature_status, humidity_status]
+
+
+def trigger_measurement(wait_for_available_measurement=True):
+    """
+    Ask the CO2 sensor to start a new measurement now if the previous one is older than 10 seconds
+    Same function as 'status()'
+    :param: wait_for_available_measurement: True to let time to the sensor to take the measurement
+    :return: Status of the sensor: List[CO2 status, temperature status, humidity status]
+    """
+    sensor_status = status(False)
+    if wait_for_available_measurement:  # if user/software want to wait for the data to be ready
+        time.sleep(10)  # sensor documentation, let time to the sensor to perform the measurement
+    return sensor_status  # same function as 'status()', but here we don't want to print the status on the screen
 
 
 def read_internal_calibration(item):
+    """
+    Read the internal calibration of the sensor
+    :param item: 'relative humidity', 'temperature', 'pressure', 'CO2', 'all'
+    :return: List[offset, gain, lower_limit, upper_limit]
+    """
     if item == 'relative humidity':
         index = 0x01
         unit = "%RH"
-        factor = 1/100
+        factor = 1 / 100
     elif item == 'temperature':
         index = 0x02
         unit = "Kelvin"
-        factor = 1/100
+        factor = 1 / 100
     elif item == 'pressure':
         index = 0x03
         unit = "mbar"
-        factor = 1/10
+        factor = 1 / 10
     elif item == 'CO2':
         index = 0x04
         unit = "ppm"
         factor = 1
     elif item == "all":
-        for i in ['relative humidity', 'temperature', 'pressure', 'CO2']:
+        for i in ['relative humidity', 'temperature', 'pressure', 'CO2']:  # iterate this function for each parameter
             read_internal_calibration(i)
-            time.sleep(0.5)
-        return
+            time.sleep(0.5)  # avoid too close i2c communication
+        return  # exit the function once the iteration is finished
     else:
         raise TypeError("Argument of read_internal_calibration is wrong, must be: 'relative humidity', "
                         "'temperature', 'pressure', 'CO2' or 'all'")
 
     reading = read_from_custom_memory(index, 8)
 
-    if reading is False:
-        return  # avoid make any calculation below with a value which is False, would make an error
+    if reading is False:  # if read_from_custom_memory() function doesn't work, will return False...
+        logger.error("Failed to read the internal calibration of the CO2 sensor")
+        return False  # indicate error
     print(reading)
     offset = (reading[0] << 8 + reading[1]) * factor
     gain = (reading[2] << 8 + reading[3]) / 32768
@@ -370,13 +405,14 @@ def read_internal_calibration(item):
 def read_from_custom_memory(index, number_of_bytes):
     """
     Read data from custom memory address in the CO2 sensor
-    :param index: index of the data to be read
-    :param number_of_bytes: number of bytes to read
+    :param index: index of the data to be read (see sensor doc)
+    :param number_of_bytes: number of bytes to read (see sensor doc)
     :return: list[bytes] from right to left
     """
     logger.debug("Reading " + str(number_of_bytes) + " bytes from customer memory at index " + str(hex(index)) + "...")
-    write = i2c_msg.write(CO2_address, [0x71, 0x54, index])
+    write = i2c_msg.write(CO2_address, [0x71, 0x54, index])  # usual bytes to send/write to initiate the reading
     attempts = 1
+
     while attempts < 4:
         try:
             with SMBus(1) as bus:
@@ -384,15 +420,16 @@ def read_from_custom_memory(index, number_of_bytes):
             read = i2c_msg.read(CO2_address, number_of_bytes)
             with SMBus(1) as bus:
                 bus.i2c_rdwr(read)
-                break  # break the trial loop
-        except:
+                break  # break the trial loop if the above has not failed
+        except:  # if i2c communication fails
             if attempts >= 3:
-                logger.error("i2c communication failed 3 times while writing to customer memory, skipping reading")
+                logger.warning("i2c communication failed 3 times while writing to customer memory, skipping reading")
                 return False  # indicate that the writing process failed, exit this function
             else:
                 logger.error("i2c communication failed to read from customer memory (" + str(attempts) + "/3)")
                 attempts += 1
-                time.sleep(1)
+                time.sleep(2)  # avoid too close i2c communication, let time to the sensor, may be busy
+
     reading = list(read)
     logger.debug("Reading from custom memory returned " + str(reading))
     return reading
@@ -405,24 +442,26 @@ def write_to_custom_memory(index, *bytes_to_write):
     :param bytes_to_write: infinite number of data to write at that place
     :return: True (Success) or False (Fail)
     """
-    logger.debug("Writing " + str(bytes_to_write) + " inside custom memory at index "+ str(hex(index)) + "...")
+    logger.debug("Writing " + str(bytes_to_write) + " inside custom memory at index " + str(hex(index)) + "...")
     crc8 = digest([index, *bytes_to_write])  # calculation of the CRC8 based on the index number and all the bytes sent
-    attempts = 1  # for writing into memory
-    cycle = 1  # for i2c communication
+    attempts = 1  # trial counter for writing into the customer memory
+    cycle = 1  # trial counter for i2c communication
 
     while cycle < 4 and attempts < 4:
         try:
             with SMBus(1) as bus:
-                write = i2c_msg.write(CO2_address, [0x71, 0x54, index, *bytes_to_write, crc8])
+                write = i2c_msg.write(CO2_address, [0x71, 0x54, index, *bytes_to_write, crc8])  # see sensor doc
                 bus.i2c_rdwr(write)
                 logger.debug("i2c writing succeeded")
+                # i2c writing function worked, and sensor didn't replied a NACK on the SCK line
+                # (see i2c working principle/theory)
 
         except:
             if attempts >= 3:
                 logger.error("i2c communication failed 3 times while writing to customer memory, skipping writing")
                 return False  # indicate that the writing process failed, exit this function
             else:
-                logger.error("i2c communication failed to write into customer memory (" + str(cycle) + "/3)")
+                logger.warning("i2c communication failed to write into customer memory (" + str(cycle) + "/3)")
                 cycle += 1
                 time.sleep(1)
 
@@ -439,27 +478,36 @@ def write_to_custom_memory(index, *bytes_to_write):
                             " into customer memory at index " + str(hex(index)))
             return False  # indicate that the writing process failed
         else:
-            logger.error("Failed in writing " + str(bytes_to_write) + " inside custom memory at index " + str(hex(index))
-                         + " (" + str(attempts) + "/3), trying again")
+            logger.error(
+                "Failed in writing " + str(bytes_to_write) + " inside custom memory at index " + str(hex(index))
+                + " (" + str(attempts) + "/3), trying again")
             logger.debug("Value read is " + str(reading) + " in place of " + str(bytes_to_write))
-            time.sleep(0.5)
+            time.sleep(2)  # avoid too close i2c communication
             attempts += 1
 
 
 # ---------------------------------------------------------------------
 # Test Execution
 # ---------------------------------------------------------------------
+
+
+# __name__ = '__main__' indicate that the Python sheet has been executed directly
+# in opposition with __name__ = '__CO2__' when the Python sheet is executed as a library from another Python sheet
+
+# What is below will be executed if user execute this Python code directly ($ python3 CO2.py)
+# Code below is used to make trials to the CO2 sensor while developping
+
 if __name__ == '__main__':
     now = datetime.now()
-    logger.info("------------------------------------")
-    log = "Launching a new execution on the " + str(now.strftime("%d/%m/%Y %H:%M:%S"))
-    logger.info(log)
+    logger.info("------------------------------------")  # add a line in the log file
+    logger.info("Launching a new execution on the " + str(now.strftime("%d/%m/%Y %H:%M:%S")))
 
-    # while (True):
-    #     getRHT()
-    #     time.sleep(1)
-    #     getCO2P()
-    #     print("waiting...")
-    #     time.sleep(10)  # wait 20 seconds
-
+    print("Reading internal timestamp")
     internal_timestamp()
+
+    while True:  # unstopped loop
+        getRHT()
+        time.sleep(1)
+        getCO2P()
+        print("waiting...")
+        time.sleep(10)  # wait 10 seconds
