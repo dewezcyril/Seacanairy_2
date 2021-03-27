@@ -1,3 +1,4 @@
+#! /home/pi/seacanairy_project/venv/bin/python3
 """
 Libraries for the use of E+E Elektronik EE894 CO2 sensor via I²C communication
 """
@@ -351,10 +352,10 @@ def internal_timestamp(new_timestamp=None):
         # ...Python crash if it tries to make calculations with a boolean (True or False)
         measuring_time_interval = (reading[1] + reading[0] * 256) / 10
         if new_timestamp is None:  # adapt the message in function of the wishes of the user (here he want to read)
-            logger.info("Internal measuring time interval is " + str(measuring_time_interval) + " seconds")
+            logger.info("Internal measuring time interval is " + str(int(measuring_time_interval)) + " seconds")
         else:  # (here he want to write)
             logger.info(
-                "Internal measuring time interval set successfully on " + str(measuring_time_interval) + " seconds")
+                "Internal measuring time interval set successfully on " + str(int(measuring_time_interval)) + " seconds")
         return measuring_time_interval
 
 

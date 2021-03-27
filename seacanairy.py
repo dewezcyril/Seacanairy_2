@@ -1,3 +1,4 @@
+#! /home/pi/seacanairy_project/venv/bin/python3
 """
 Main Seacanairy Python Code that execute all the necessary functions to make the system work and take sample
 at required intervals
@@ -80,7 +81,6 @@ def append_data_to_csv(*data_to_write):
     to_write = []
     for arg in data_to_write:
         to_write.append(arg)
-    print("Saving data in", path_csv)
     with open(path_csv, mode='a', newline='') as csv_file:
         writer = csv.writer(csv_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
         writer.writerow(to_write)
@@ -117,16 +117,17 @@ def wait_timestamp(starting_time, finish_time):
 
 
 now = datetime.now()
-logger.info("Starting of Seacanairy on the " + str(now.strftime("%d/%m/%Y %H:%M:%S")))
+logger.info("Starting of Seacanairy on the " + str(now.strftime("%d/%m/%Y at %H:%M:%S")))
 
 # Check that the file exist, if not, write the first line (name of the columns)
 if os.path.isfile(path_csv):
     logger.info("'" + str(path_csv) + "' already exist, appending data to this file")
 else:
+    logger.info("Initiating '" + str(project_name) + "' file")
     append_data_to_csv("Date/Time", "Relative Humidity", "Temperature", "Pressure", "CO2 average", "CO2 instant",
                        "PM 1", "PM 2.5", "PM 10", "Temperature OPC", "Relative Humidity OPC",
                        "bin", "MToF", "Sampling Time", "Sample flow rate",
-                       "reject count glitch", "reject count longTOF", "reject count ratio", "reject count out of range",
+                       "reject count glitch", "reject count long TOF", "reject count ratio", "reject count out of range",
                        "fan revolution count", "laser status")
 
 # Read the internal timestamp of the sensor, and change the value if necessary
@@ -149,13 +150,13 @@ while True:
     OPC_data = OPCN3.getdata(OPC_flushing_time, OPC_sampling_time)
 
     print("  ")
-
+    print("Saving data in", path_csv)
     if OPC_keep_all_data:
         append_data_to_csv(now, CO2_data["relative humidity"], CO2_data["temperature"], CO2_data["average"], CO2_data["instant"],
                            OPC_data["PM 1"], OPC_data["PM 2.5"], OPC_data["PM 10"], OPC_data["temperature"], OPC_data["relative humidity"],
                            OPC_data["bin"],
-                           OPC_data["MToF"], OPC_data["sampling time"], OPC_data["sample flow rate"], OPC_data["reject count out of range"],
-                           OPC_data["fan revolution count"], OPC_data["laser status"])
+                           OPC_data["MToF"], OPC_data["sampling time"], OPC_data["sample flow rate"], OPC_data["reject count glitch"],
+                           OPC_data["reject count long TOF"], OPC_data["reject count ratio"], OPC_data["reject count out of range"], OPC_data["fan revolution count"], OPC_data["laser status"])
     else:
         append_data_to_csv(now, CO2_data["relative humidity"], CO2_data["temperature"], CO2_data["average"], CO2_data["instant"],
                            OPC_data["PM 1"], OPC_data["PM 2.5"], OPC_data["PM 10"], OPC_data["temperature"], OPC_data["relative humidity"])
