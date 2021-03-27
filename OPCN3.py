@@ -480,7 +480,7 @@ def read_histogram(sampling_period):
     else:
         log = "Failed to initiate histogram, skipping this measurement"
         logger.critical(log)
-        return
+        return [-255, -255, -255, -255, -255]  # indicate clearly an error in the data recording
 
     delay = sampling_period * 2  # you must wait two times the sampling_period in order that
     # the sampling time given by the OPC-N3 respects your sampling time wishes
@@ -492,99 +492,95 @@ def read_histogram(sampling_period):
     bar.finish()
 
     attempts = 1  # reset the counter for next measurement
-    try:
-        while attempts < 4:
-            if initiate_transmission(0x30):
-                unused = spi.xfer([0x30] * 48)
-                MToF = spi.xfer([0x30] * 4)
-                sampling_time = spi.xfer([0x30] * 2)
-                sample_flow_rate = spi.xfer([0x30] * 2)
-                temperature = spi.xfer([0x30] * 2)
-                relative_humidity = spi.xfer([0x30] * 2)
-                PM_A = spi.xfer([0x30] * 4)
-                PM_B = spi.xfer([0x30] * 4)
-                PM_C = spi.xfer([0x30] * 4)
-                reject_count_glitch = spi.xfer([0x30] * 2)
-                reject_count_longTOF = spi.xfer([0x30] * 2)
-                reject_count_ratio = spi.xfer([0x30] * 2)
-                reject_count_Out_Of_Range = spi.xfer([0x30] * 2)
-                fan_rev_count = spi.xfer([0x30] * 2)
-                laser_status = spi.xfer([0x30] * 2)
-                checksum = spi.xfer([0x30] * 2)
-                spi.close()
+    while attempts < 4:
+        if initiate_transmission(0x30):
+            unused = spi.xfer([0x30] * 48)
+            MToF = spi.xfer([0x30] * 4)
+            sampling_time = spi.xfer([0x30] * 2)
+            sample_flow_rate = spi.xfer([0x30] * 2)
+            temperature = spi.xfer([0x30] * 2)
+            relative_humidity = spi.xfer([0x30] * 2)
+            PM_A = spi.xfer([0x30] * 4)
+            PM_B = spi.xfer([0x30] * 4)
+            PM_C = spi.xfer([0x30] * 4)
+            reject_count_glitch = spi.xfer([0x30] * 2)
+            reject_count_longTOF = spi.xfer([0x30] * 2)
+            reject_count_ratio = spi.xfer([0x30] * 2)
+            reject_count_Out_Of_Range = spi.xfer([0x30] * 2)
+            fan_rev_count = spi.xfer([0x30] * 2)
+            laser_status = spi.xfer([0x30] * 2)
+            checksum = spi.xfer([0x30] * 2)
+            spi.close()
 
-                if check(checksum, unused, MToF, sampling_time, sample_flow_rate, temperature, relative_humidity,
-                         PM_A, PM_B,
-                         PM_C, reject_count_glitch, reject_count_longTOF, reject_count_ratio, reject_count_Out_Of_Range,
-                         fan_rev_count, laser_status):
-                    # this means that the data are correct, they can be processed and printed
-                    # rounding until 2 decimals, as this is the accuracy of the OPC-N3 for PM values
-                    PM1 = round(struct.unpack('f', bytes(PM_A))[0], 2)
-                    PM25 = round(struct.unpack('f', bytes(PM_B))[0], 2)
-                    PM10 = round(struct.unpack('f', bytes(PM_C))[0], 2)
-                    print("PM 1:\t", PM1, " mg/m3", end = "\t\t|\t")
-                    print("PM 2.5:\t", PM25, " mg/m3", end = "\t\t|\t")
-                    print("PM 10:\t", PM10, " mg/m3")
+            if check(checksum, unused, MToF, sampling_time, sample_flow_rate, temperature, relative_humidity,
+                     PM_A, PM_B,
+                     PM_C, reject_count_glitch, reject_count_longTOF, reject_count_ratio, reject_count_Out_Of_Range,
+                     fan_rev_count, laser_status):
+                # this means that the data are correct, they can be processed and printed
+                # rounding until 2 decimals, as this is the accuracy of the OPC-N3 for PM values
+                PM1 = round(struct.unpack('f', bytes(PM_A))[0], 2)
+                PM25 = round(struct.unpack('f', bytes(PM_B))[0], 2)
+                PM10 = round(struct.unpack('f', bytes(PM_C))[0], 2)
+                print("PM 1:\t", PM1, " mg/m3", end = "\t\t|\t")
+                print("PM 2.5:\t", PM25, " mg/m3", end = "\t\t|\t")
+                print("PM 10:\t", PM10, " mg/m3")
 
-                    relative_humidity = round(100 * (join_bytes(relative_humidity) / (2 ** 16 - 1)), 2)
-                    temperature = round(-45 + 175 * (join_bytes(temperature) / (2 ** 16 - 1)), 2)  # conversion in °C
-                    print("Temperature:", temperature, " °C (PCB Board)\t| \tRelative Humidity:", relative_humidity, " %RH (PCB Board)")
+                relative_humidity = round(100 * (join_bytes(relative_humidity) / (2 ** 16 - 1)), 2)
+                temperature = round(-45 + 175 * (join_bytes(temperature) / (2 ** 16 - 1)), 2)  # conversion in °C
+                print("Temperature:", temperature, " °C (PCB Board)\t| \tRelative Humidity:", relative_humidity, " %RH (PCB Board)")
 
-                    sampling_time = join_bytes(sampling_time) / 100
-                    print(" Sampling period:", sampling_time, "seconds", end="\t\t|\t")
-                    sample_flow_rate = join_bytes(sample_flow_rate) / 100
-                    print(" Sampling flow rate:", sample_flow_rate, "ml/s |", round(sample_flow_rate * 60 / 1000, 2),"L/min")
+                sampling_time = join_bytes(sampling_time) / 100
+                print(" Sampling period:", sampling_time, "seconds", end="\t\t|\t")
+                sample_flow_rate = join_bytes(sample_flow_rate) / 100
+                print(" Sampling flow rate:", sample_flow_rate, "ml/s |", round(sample_flow_rate * 60 / 1000, 2),"L/min")
 
-                    reject_count_glitch = join_bytes(reject_count_glitch)
-                    print(" Reject count glitch:", reject_count_glitch, end="\t\t|\t")
-                    reject_count_longTOF = join_bytes(reject_count_longTOF)
-                    print(" Reject count long TOF:", reject_count_longTOF)
-                    reject_count_ratio = join_bytes(reject_count_ratio)
-                    print(" Reject count ratio:", reject_count_ratio, end="\t\t|\t")
-                    reject_count_Out_Of_Range = join_bytes(reject_count_Out_Of_Range)
-                    print(" Reject count Out Of Range:", reject_count_Out_Of_Range)
-                    fan_rev_count = join_bytes(fan_rev_count)
-                    print(" Fan revolutions count:", fan_rev_count, end="\t\t|\t")
-                    laser_status = join_bytes(laser_status)
-                    print(" Laser status:", laser_status)
+                reject_count_glitch = join_bytes(reject_count_glitch)
+                print(" Reject count glitch:", reject_count_glitch, end="\t\t|\t")
+                reject_count_longTOF = join_bytes(reject_count_longTOF)
+                print(" Reject count long TOF:", reject_count_longTOF)
+                reject_count_ratio = join_bytes(reject_count_ratio)
+                print(" Reject count ratio:", reject_count_ratio, end="\t\t|\t")
+                reject_count_Out_Of_Range = join_bytes(reject_count_Out_Of_Range)
+                print(" Reject count Out Of Range:", reject_count_Out_Of_Range)
+                fan_rev_count = join_bytes(fan_rev_count)
+                print(" Fan revolutions count:", fan_rev_count, end="\t\t|\t")
+                laser_status = join_bytes(laser_status)
+                print(" Laser status:", laser_status)
 
-                    print(" Bin number:\t", end='')
-                    for i in range(0, 24):
-                        x = 2 * i
-                        y = x + 1
-                        answer = join_bytes(unused[x:y])
-                        print(answer, end=", ")
-                    print("")  # go to next line
-                    print(" MToF:\t\t", end='')
-                    for i in range(0, 4):
-                        print(MToF[i], end=", ")
-                    print("")  # go to next line
+                print(" Bin number:\t", end='')
+                for i in range(0, 24):
+                    x = 2 * i
+                    y = x + 1
+                    answer = join_bytes(unused[x:y])
+                    print(answer, end=", ")
+                print("")  # go to next line
+                print(" MToF:\t\t", end='')
+                for i in range(0, 4):
+                    print(MToF[i], end=", ")
+                print("")  # go to next line
 
-                    if sampling_time > (sampling_period + 0.5):  # we tolerate a difference of 0.5 seconds
-                        log = "Sampling period of the sensor was " + str(round(sampling_time - sampling_period, 2)) + " seconds longer than expected"
-                        logger.info(log)
+                if sampling_time > (sampling_period + 0.5):  # we tolerate a difference of 0.5 seconds
+                    log = "Sampling period of the sensor was " + str(round(sampling_time - sampling_period, 2)) + " seconds longer than expected"
+                    logger.info(log)
 
-                    elif sampling_time < (sampling_period - 0.5):
-                        logger.info("Sampling period of the sensor was " + str(round(sampling_period - sampling_time, 2)) + " seconds shorter than expected")
+                elif sampling_time < (sampling_period - 0.5):
+                    logger.info("Sampling period of the sensor was " + str(round(sampling_period - sampling_time, 2)) + " seconds shorter than expected")
 
-                    return [PM1, PM25, PM10, temperature, relative_humidity]
+                return [PM1, PM25, PM10, temperature, relative_humidity]
 
-                else:
-                    log = "Checksum is wrong, trying again to read the histogram (" + str(attempts) + "/3)"
-                    logger.error(log)
-                    time.sleep(wait_reset_SPI_buffer)  # let some times between two SPI communications
-                    attempts += 1
-            if attempts >= 3:
-                log = "Checksum was wrong 3 times, skipping this histogram reading"
-                logger.critical(log)
-                return [-255, -255, -255, -255, -255]
-
-    except SystemExit or KeyboardInterrupt:  # to stop the laser and the fan in case of error or shutting down the program
-        log = "Stopping Python instance during measurement, stopping laser and fan"
-        logger.info(log)
-        laser_off()
-        fan_off()
-        raise
+            else:
+                log = "Checksum is wrong, trying again to read the histogram (" + str(attempts) + "/3)"
+                logger.error(log)
+                time.sleep(wait_reset_SPI_buffer)  # let some times between two SPI communications
+                attempts += 1
+        else:
+            # used to break the loop if 'if initiate_transmission()' fails 3 consecutive times
+            attempts += 1  # if 'if initiate_transmission():' fails, then increment 'attempts'
+            time.sleep(wait_reset_SPI_buffer)
+        if attempts >= 3:
+            log = "Checksum was wrong 3 times, skipping this histogram reading"
+            logger.critical(log)
+            return [-255, -255, -255, -255, -255]
 
 
 def getdata(flushing_time, sampling_time):
@@ -595,13 +591,20 @@ def getdata(flushing_time, sampling_time):
     :return: List[PM1, PM25, PM10, temperature, relative_humidity]
     """
     data = [-255, -255, -255, -255, -255]
-    if fan_on():
-        time.sleep(flushing_time)
-        if laser_on():
-            data = read_histogram(sampling_time)
+    try:  # necessary to put an except condition (see below)
+        if fan_on():
+            time.sleep(flushing_time)
+            if laser_on():
+                data = read_histogram(sampling_time)
+            laser_off()
+        fan_off()
+        return data
+
+    except SystemExit or KeyboardInterrupt:  # in case of error AND if user stop the software
+        logger.info("Python instance has been stopped, shutting laser and fan OFF...")
         laser_off()
-    fan_off()
-    return data
+        fan_off()
+        raise
 
 
 def join_bytes(list_of_bytes):
