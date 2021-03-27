@@ -12,6 +12,12 @@ from datetime import date, datetime
 # smbus2 is the new smbus, allow more than 32 bits writing/reading
 from smbus2 import SMBus, i2c_msg
 
+# logging
+import logging
+
+# yaml settings
+import yaml
+
 # 'SMBus' is the general driver for i2c communication
 # 'i2c_msg' allow to make i2c write followed by i2c read WITHOUT any STOP byte (see sensor documentation)
 
@@ -22,17 +28,29 @@ CO2_address = 0x33  # i2c address by default, can be changed (see sensor doc)
 bus = SMBus(1)  # make it easier to read/write to the sensor (bus.read or bus.write...)
 
 # --------------------------------------------------------
+# YAML SETTINGS
+# --------------------------------------------------------
+
+with open('/home/pi/seacanairy_project/seacanairy_settings.yaml') as file:
+    settings = yaml.safe_load(file)
+    file.close()
+
+store_debug_messages = settings['CO2 sensor']['Store debug messages (important increase of logs)']
+
+project_name = settings['Seacanairy settings']['Sampling session name']
+
+measurement_delay = settings['CO2 sensor']['Amount of time required for the sensor to take the measurement']
+
+# --------------------------------------------------------
 # LOGGING SETTINGS
 # --------------------------------------------------------
 # all the settings and other code for the logging
 # logging = tak a trace of some messages in a file to be reviewed afterward (check for errors fe)
 
-import logging
-
 if __name__ == '__main__':  # if you run this code directly ($ python3 CO2.py)
     message_level = logging.DEBUG  # show ALL the logging messages
     log_file = '/home/pi/seacanairy_project/log/CO2-debug.log'  # complete file location required for the Raspberry
-    print("DEBUG messages will be shown and stored in '" + str(log_file) +"'")
+    print("DEBUG messages will be shown and stored in '" + str(log_file) + "'")
 
     # The following HANDLER must be activated ONLY if you run this code alone
     # Without the 'if __name__ == '__main__' condition, all the logging messages are displayed 3 TIMES
@@ -50,8 +68,11 @@ if __name__ == '__main__':  # if you run this code directly ($ python3 CO2.py)
 
 else:  # if this file is considered as a library (if you execute seacanairy.py for example)
     # it will only print and store INFO messages in the corresponding log_file
-    message_level = logging.INFO
-    log_file = '/home/pi/seacanairy_project/log/seacanairy.log'  # complete location needed on the RPI
+    if store_debug_messages:
+        message_level = logging.DEBUG
+    else:
+        message_level = logging.INFO
+    log_file = '/home/pi/seacanairy_project/log/' + project_name + '.log'  # complete location needed on the RPI
 
     # no need to add a handler, because there is already one in seacanairy.py
 
@@ -63,6 +84,8 @@ logging.basicConfig(level=message_level,
                     filemode='a')
 
 logger = logging.getLogger('CO2 sensor')  # name of the logger
+
+
 # all further logging must be called by logger.'level' and not logging.'level'
 # if not, the logging will be displayed as ROOT and NOT 'CO2 sensor'
 
@@ -147,7 +170,7 @@ def getRHT():
         CO2_get_RH_T()[0] = relative humidity
         CO2_get_RH_T()[1] = temperature
 
-    :return:  List[Relative Humidity (%RH), Temperature (°C)]
+    :return:  Dictionary("RH", "temperature")
     """
     log = "Reading RH and Temperature from CO2 sensor"
     logger.debug(log)
@@ -157,6 +180,12 @@ def getRHT():
 
     attempts = 0  # trial counter for the checksum and the validity of the data received
     reading_trials = 0  # trial counter for the i2c communication
+
+    # In case there is a problem and it return nothing, return -255, which can be understood as an error
+    data = {
+        "relative humidity": -255,
+        "temperature": -255
+    }
 
     # all the following code is in a loop so that if the checksum is wrong, it start a new measurement
     while attempts < 4:
@@ -171,7 +200,7 @@ def getRHT():
                 if reading_trials == 3:
                     log = "RH and temperature lecture from CO2 sensor aborted. (3/3) i2c transmission problem."
                     logger.critical(log)
-                    return [-255, -255]  # indicate clearly that data are wrong
+                    return data  # indicate clearly that data are wrong
 
                 log = "Error in the i2c transmission, trying again... (" + str(reading_trials + 1) + ")"
                 logger.error(log)
@@ -189,14 +218,18 @@ def getRHT():
             print("Temperature is:", temperature, "°C", end="")
             print("\t| Relative humidity is:", relative_humidity, "%RH")
 
-            RH_T = [relative_humidity, temperature]  # create a chain of values to be returned by the function
+            # Create a dictionnary containing all the data
+            data = {
+                "relative humidity": relative_humidity,
+                "temperature": temperature
+            }
 
-            return RH_T
+            return data
 
         else:  # if one or both checksums are not corrects
             if attempts == 3:
                 logger.error("Error in the data received (3/3), temperature and humidity reading skipped")
-                return [-255, -255]  # indicate on the SD card that data are wrong
+                return data  # indicate on the SD card that data are wrong
 
             else:
                 attempts += 1
@@ -211,7 +244,7 @@ def getCO2P():
         CO2_get_CO2_P()[1] = CO2_raw
         CO2_get_CO2_P()[2] = pressure
 
-    :return: List[CO2 (average), CO2 (instant measurement), Atmospheric Pressure)
+    :return: Dictionary["average", "instant", "pressure")
     """
     logger.debug('Reading of CO2 and pressure')
 
@@ -220,6 +253,13 @@ def getCO2P():
 
     attempts = 0  # trial counter for the checksum and the validity of the data received
     reading_trials = 0  # trial counter for the i2c communication
+
+    # Create a dictionary containing the data, return -255 in case of error
+    data = {
+        "average": -255,
+        "instant": -255,
+        "pressure": -255
+    }
 
     # all the following code is in a loop so that if the checksum is wrong, it start a new measurement
     while attempts < 4:
@@ -233,7 +273,7 @@ def getCO2P():
             except:  # what happens if the i2c fails
                 if reading_trials == 3:
                     logger.critical("RH and temperature lecture from CO2 sensor aborted. i2c transmission problem.")
-                    return [-255, -255, -255]  # indicate clearly that the data are wrong
+                    return data  # indicate clearly that the data are wrong
 
                 logger.error("Error in the i2c transmission, trying again... (" + str(reading_trials + 1) + "/3)")
                 reading_trials += 1  # increment of reading_trials
@@ -253,19 +293,37 @@ def getCO2P():
             CO2_raw = (reading[3] << 8) + reading[4]
             print("\t\t| CO2 instant is:", CO2_raw, "ppm")
 
-            CO2_P = [CO2_average, CO2_raw, pressure]  # create a chain of values to be returned by the function
+            data = {
+                "average": CO2_average,
+                "instant": CO2_raw,
+                "pressure": pressure
+            }
 
-            return CO2_P
+            return data
 
         else:  # if one or both checksums are not corrects
             if attempts == 3:
                 logger.error("Error in the data received. CO2 and pressure reading aborted")
-                return [-255, -255, -255]  # indicate clearly that the data are wrong
+                return data  # indicate clearly that the data are wrong
 
             else:
                 attempts += 1
                 logger.warning("Error in the data received. Reading data again... (" + str(attempts) + "/3)")
                 time.sleep(1)  # avoid too close i2c communication
+
+
+def get_data():
+    """
+    Read all the data from the CO2 sensor
+    :return: Dictionary("pressure", "temperature", "CO2 average", "CO2 instant")
+    """
+    # Get CO2 and pressure
+    data1 = getCO2P()
+    # Get RH and temperature
+    data2 = getRHT()
+    # Append those two dictionary
+    data1.update(data2)
+    return data1
 
 
 # ---------------------------------------------------------------------
@@ -336,9 +394,11 @@ def trigger_measurement(wait_for_available_measurement=True):
     :param: wait_for_available_measurement: True to let time to the sensor to take the measurement
     :return: Status of the sensor: List[CO2 status, temperature status, humidity status]
     """
+    logger.info("Triggering a new measurement...")
     sensor_status = status(False)
     if wait_for_available_measurement:  # if user/software want to wait for the data to be ready
-        time.sleep(10)  # sensor documentation, let time to the sensor to perform the measurement
+        logger.info("Waiting " + str(measurement_delay) + " seconds for sensor to take measurement")
+        time.sleep(measurement_delay)  # sensor documentation, let time to the sensor to perform the measurement
     return sensor_status  # same function as 'status()', but here we don't want to print the status on the screen
 
 

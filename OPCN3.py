@@ -11,6 +11,25 @@ import os.path
 from progress.bar import IncrementalBar  # progress bar during sampling
 # import RPi.GPIO as GPIO
 
+# yaml settings
+import yaml
+
+# --------------------------------------------------------
+# YAML SETTINGS
+# --------------------------------------------------------
+
+with open('/home/pi/seacanairy_project/seacanairy_settings.yaml') as file:
+    settings = yaml.safe_load(file)
+    file.close()
+
+store_debug_messages = settings['CO2 sensor']['Store debug messages (important increase of logs)']
+
+project_name = settings['Seacanairy settings']['Sampling session name']
+
+OPC_flushing_time = settings['OPC-N3 sensor']['Flushing time']
+
+OPC_sampling_time = settings['OPC-N3 sensor']['Sampling time']
+
 # --------------------------------------------------------
 # LOGGING SETTINGS
 # --------------------------------------------------------
@@ -25,10 +44,6 @@ if __name__ == '__main__':  # if you run this code directly ($ python3 CO2.py)
     log_file = '/home/pi/seacanairy_project/log/OPCN3-debug.log'  # complete file location required for the Raspberry
     print("DEBUG messages will be shown and stored in '" + str(log_file) + "'")
 
-    # The following HANDLER must be activated ONLY if you run this code alone
-    # Without the 'if __name__ == '__main__' condition, all the logging messages are displayed 3 TIMES
-    # (once for the handler in CO2.py, once for the handler in OPCN3.py, and once for the handler in seacanairy.py)
-
     # define a Handler which writes INFO messages or higher to the sys.stderr/display
     console = logging.StreamHandler()
     console.setLevel(message_level)
@@ -38,23 +53,28 @@ if __name__ == '__main__':  # if you run this code directly ($ python3 CO2.py)
     console.setFormatter(formatter)
     # add the handler to the root logger
     logging.getLogger().addHandler(console)
-else:  # if this file is considered as a library (if you execute seacanairy.py for example)
-    # it will only print and store INFO messages in the corresponding log_file
-    message_level = logging.INFO
-    log_file = '/home/pi/seacanairy_project/log/seacanairy.log'  # complete location needed on the RPI
 
+else:  # if this file is considered as a library (if you execute 'seacanairy.py' for example)
+    # it will only print and store INFO messages and above in the corresponding log_file
+    if store_debug_messages:
+        message_level = logging.DEBUG
+    else:
+        message_level = logging.INFO
+    log_file = '/home/pi/seacanairy_project/log/' + project_name + '.log'  # complete location needed on the RPI
     # no need to add a handler, because there is already one in seacanairy.py
+
 
 # set up logging to file
 logging.basicConfig(level=message_level,
                     format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
-                    datefmt='%d-%m %H:%M:%S',
+                    datefmt='%d-%m %H:%M',
                     filename=log_file,
                     filemode='a')
 
 logger = logging.getLogger('OPC-N3')  # name of the logger
 # all further logging must be called by logger.'level' and not logging.'level'
-# if not, the logging will be displayed as ROOT and NOT 'OPC-N3'
+# if not, the logging will be displayed as 'ROOT' and NOT 'OPC-N3'
+
 
 # ----------------------------------------------
 # SPI CONFIGURATION
@@ -127,10 +147,10 @@ def initiate_transmission(command_byte):
             attempts += 1
 
         elif reading == [230] or reading == [99] or reading == [0]:
-            # during developping, I noticed that those were the value read while having this kind of issue
+            # during developing, I noticed that those were the value read while having this kind of issue
             # this comes from personal investigation and not from the official documentation
             logger.critical("Problem with the SS (Slave Select) line "
-                            "(error code " + str(hex(reading[0])) + "), Trying again...")
+                            "(error code " + str(hex(reading[0])) + "), skipping")
             cycle += 1
             logger.debug("Check that SS line is well kept DOWN (0V) during transmission."
                          " Try again by connecting SS Line of sensor to Ground")
@@ -139,7 +159,7 @@ def initiate_transmission(command_byte):
 
         else:
             logger.critical("Failed to initiate transmission (unexpected code returned: " + str(hex(reading[0])) + ") (" + str(cycle) + "/3)")
-            time.sleep(1)  # wait 1e-05 before next command
+            time.sleep(wait_reset_SPI_buffer)
             cycle += 1  # increment of attempts
 
         if attempts > 60:
@@ -185,17 +205,19 @@ def fan_off():
                 time.sleep(1)  # let some time to the OPC-N3 (to try to stop the fan)
                 reading = read_DAC_power_status('fan')
                 if reading == 0:
-                    logger.warning("Wrong answer received after SPI writing, but fan is well OFF")
                     return False
                 elif reading == 1:
                     attempts += 1
                     time.sleep(wait_reset_SPI_buffer)
                     logger.warning("Failed to stop the fan, trying again...")
+                else:
+                    attempts += 1
+            if attempts >= 3:
+                logger.critical("Failed 3 consecutive times to stop the fan")
+                return True
         else:
-            attempts += 1
-        if attempts >= 3:
-            logger.critical("Failed 3 times to stop the fan")
-            return
+            logger.critical("Failed to stop the fan (transmission problem)")
+            return True
 
 
 def fan_on():
@@ -221,24 +243,25 @@ def fan_on():
                 time.sleep(1)  # let time to the OPC-N3 to try to start the fan
                 reading = read_DAC_power_status('fan')
                 if reading == 1:
-                    logger.warning("Wrong answer received after SPI writing, but fan is well ON")
                     return True  # indicate that fan has started
                 elif reading == 0:
-                    logger.error("Failed to start the fan")
+                    logger.error("Failed to start the fan...")
                     attempts += 1
                     time.sleep(wait_reset_SPI_buffer)
+                else:
+                    attempts += 1
+            if attempts >= 3:
+                log = "Failed 3 times to start the fan"
+                logger.critical(log)
+                return False  # indicate that fan is OFF
         else:
-            attempts += 1
-        if attempts >= 3:
-            log = "Failed 3 times to start the fan"
-            logger.critical(log)
-            return False  # indicate that fan is OFF
+            logger.critical("Failed to start the fan (transmission problem)")
+            return False
 
 
 def laser_on():
     """
     Turn ON the laser of the OPC-N3.
-    :param: end_of_print_message: (optional) to concatenate the print messages on a same line on the console
     :return: TRUE
     """
     logger.debug("Turn the laser ON")
@@ -263,11 +286,12 @@ def laser_on():
                     logger.error("Failed to start the laser, trying again...")
                     attempts += 1
                     time.sleep(wait_reset_SPI_buffer)
+            if attempts >= 3:
+                logger.critical("Failed 3 times to start the laser")
+                return False  # indicate that laser is still off
         else:
-            attempts += 1
-        if attempts >= 3:
-            logger.critical("Failed 3 times to start the laser")
-            return False  # indicate that laser is still off
+            logger.critical("Failed to start the laser (transmission problem)")
+            return False
 
 
 def laser_off():
@@ -297,16 +321,16 @@ def laser_off():
                     logger.error("Failed to stop the laser (code returned is " + str(reading) + "), trying again...")
                     attempts += 1
                     time.sleep(wait_reset_SPI_buffer)
+            if attempts >= 3:
+                logger.critical("Failed 4 times to stop the laser")
+                return True  # indicate that laser is still on
         else:
-            attempts += 1
-        if attempts >= 3:
-            logger.critical("Failed 4 times to stop the laser")
-            return True  # indicate that laser is still on
+            logger.critical("Failed to stop the laser (transmission problem)")
 
 
 def read_DAC_power_status(item='all'):
     """
-    Read the status of the Digital to Analog Converter as well as the Power Status
+    Read the status of the Digital to Analog Converter as well as the Power Status (TRY TO READ ONLY ONCE)
     :param item: 'fan', 'laser', fanDAC', 'laserDAC', 'laser_switch', 'gain', 'auto_gain_toggle', 'all'
     :return:
     """
@@ -402,6 +426,21 @@ def convert_IEEE754(value):
     return answer
 
 
+def loading_bar(name, delay):
+    """
+    Show a loading bar on the screen during sampling for example
+    :param name: Text to be shown on the left of the loading bar
+    :param length: Number of increments necessary for the bar to be full
+    :return: nothing
+    """
+    bar = IncrementalBar(name, max=(2 * delay), suffix='%(elapsed)s/' + str(delay) + ' seconds')
+    for i in range(2 * delay):
+        time.sleep(0.5)
+        bar.next()
+    bar.finish()
+    return
+
+
 def PM_reading():
     """
     Read the PM bytes from the OPC-N3 sensor
@@ -465,36 +504,51 @@ def read_histogram(sampling_period):
     """
     Read all the data of the OPC-N3
     :param: flush: time (seconds) during while the fan is running
-    :return: List[PM1, PM25, PM10, temperature, relative_humidity]
+    :return: Dictionary["PM 1", "PM 2.5", "PM 10", "temperature", "relative humidity", "bin", "MToF", "sampling time",
+                  "sample flow rate", "reject count glitch", "reject count longTOF", "reject count ratio",
+                  "reject count out of range", "fan revolution count", "laser status"]
     """
-    # Delete old histogram data and start a new one
-    attempts = 1
-
     logger.debug("Reading histogram...")
 
+    # Create a dictionary containing data to be returned in case of error
+    to_return = {
+        "PM 1": -255,
+        "PM 2.5": -255,
+        "PM 10": -255,
+        "temperature": -255,
+        "relative humidity": -255,
+        "bin": -255,
+        "MToF": -255,
+        "sampling time": -255,
+        "sample flow rate": -255,
+        "reject count glitch": -255,
+        "reject count long TOF": -255,
+        "reject count ratio": -255,
+        "reject count out of range": -255,
+        "fan revolution count": -255,
+        "laser status": -255
+    }
+
+    # Delete old histogram data and start a new one
     if initiate_transmission(0x30):
         spi.xfer([0x30] * 86)
         spi.close()
-        log = "Old histogram in the OPC-N3 deleted, start a new one"
-        logger.debug(log)
+        logger.debug("Old histogram in the OPC-N3 deleted, starting a new one")
     else:
-        log = "Failed to initiate histogram, skipping this measurement"
-        logger.critical(log)
-        return [-255, -255, -255, -255, -255]  # indicate clearly an error in the data recording
+        logger.critical("Failed to initiate histogram, skipping this measurement")
+        return to_return  # indicate clearly an error in the data recording
 
     delay = sampling_period * 2  # you must wait two times the sampling_period in order that
     # the sampling time given by the OPC-N3 respects your sampling time wishes
-    bar = IncrementalBar('Sampling', max=(2 * delay), suffix='%(elapsed)s/' + str(delay) + ' seconds')
-    for i in range(0, 2 * delay):
-        time.sleep(0.5)
-        bar.next()
+    # first 5 seconds are with low gain, and the next seconds are with high gain (automatically performed by OPC-N3)
 
-    bar.finish()
+    loading_bar('Sampling', delay)
 
     attempts = 1  # reset the counter for next measurement
     while attempts < 4:
         if initiate_transmission(0x30):
-            unused = spi.xfer([0x30] * 48)
+            # read all the bytes and store them in a dedicated variable
+            bin = spi.xfer([0x30] * 48)
             MToF = spi.xfer([0x30] * 4)
             sampling_time = spi.xfer([0x30] * 2)
             sample_flow_rate = spi.xfer([0x30] * 2)
@@ -512,11 +566,12 @@ def read_histogram(sampling_period):
             checksum = spi.xfer([0x30] * 2)
             spi.close()
 
-            if check(checksum, unused, MToF, sampling_time, sample_flow_rate, temperature, relative_humidity,
+            # check that the data transmitted are correct by comparing the checksums
+            if check(checksum, bin, MToF, sampling_time, sample_flow_rate, temperature, relative_humidity,
                      PM_A, PM_B,
                      PM_C, reject_count_glitch, reject_count_longTOF, reject_count_ratio, reject_count_Out_Of_Range,
                      fan_rev_count, laser_status):
-                # this means that the data are correct, they can be processed and printed
+                # return TRUE if the data are correct, and execute the below
                 # rounding until 2 decimals, as this is the accuracy of the OPC-N3 for PM values
                 PM1 = round(struct.unpack('f', bytes(PM_A))[0], 2)
                 PM25 = round(struct.unpack('f', bytes(PM_B))[0], 2)
@@ -551,7 +606,7 @@ def read_histogram(sampling_period):
                 for i in range(0, 24):
                     x = 2 * i
                     y = x + 1
-                    answer = join_bytes(unused[x:y])
+                    answer = join_bytes(bin[x:y])
                     print(answer, end=", ")
                 print("")  # go to next line
                 print(" MToF:\t\t", end='')
@@ -566,21 +621,39 @@ def read_histogram(sampling_period):
                 elif sampling_time < (sampling_period - 0.5):
                     logger.info("Sampling period of the sensor was " + str(round(sampling_period - sampling_time, 2)) + " seconds shorter than expected")
 
-                return [PM1, PM25, PM10, temperature, relative_humidity]
+                to_return = {
+                    "PM 1": PM1,
+                    "PM 2.5": PM25,
+                    "PM 10": PM10,
+                    "temperature": temperature,
+                    "relative humidity": relative_humidity,
+                    "bin": bin,
+                    "MToF": MToF,
+                    "sampling time": sampling_time,
+                    "sample flow rate": sample_flow_rate,
+                    "reject count glitch": reject_count_glitch,
+                    "reject count long TOF": reject_count_longTOF,
+                    "reject count ratio": reject_count_ratio,
+                    "reject count out of range": reject_count_Out_Of_Range,
+                    "fan revolution count": fan_rev_count,
+                    "laser status": laser_status
+                }
+
+                return to_return
 
             else:
+                # if the function with the checksum return an error (FALSE)
                 log = "Checksum is wrong, trying again to read the histogram (" + str(attempts) + "/3)"
                 logger.error(log)
                 time.sleep(wait_reset_SPI_buffer)  # let some times between two SPI communications
                 attempts += 1
         else:
-            # used to break the loop if 'if initiate_transmission()' fails 3 consecutive times
-            attempts += 1  # if 'if initiate_transmission():' fails, then increment 'attempts'
-            time.sleep(wait_reset_SPI_buffer)
+            logger.critical("Failed to read histogram (transmission initiation problem)")
+            return to_return
+
         if attempts >= 3:
-            log = "Checksum was wrong 3 times, skipping this histogram reading"
-            logger.critical(log)
-            return [-255, -255, -255, -255, -255]
+            logger.critical("Checksum was wrong 3 times, skipping this histogram reading")
+            return to_return
 
 
 def getdata(flushing_time, sampling_time):
@@ -590,15 +663,37 @@ def getdata(flushing_time, sampling_time):
     :param sampling_time: time during which the sensor is sampling
     :return: List[PM1, PM25, PM10, temperature, relative_humidity]
     """
-    data = [-255, -255, -255, -255, -255]
+    # return -255 everywhere in case of error during the measurement
+    # seacanairy.py need that the dictionary is full of items, if not, python instance will stop
+    to_return = {
+        "PM 1": -255,
+        "PM 2.5": -255,
+        "PM 10": -255,
+        "temperature": -255,
+        "relative humidity": -255,
+        "bin": -255,
+        "MToF": -255,
+        "sampling time": -255,
+        "sample flow rate": -255,
+        "reject count glitch": -255,
+        "reject count long TOF": -255,
+        "reject count ratio": -255,
+        "reject count out of range": -255,
+        "fan revolution count": -255,
+        "laser status": -255
+    }
     try:  # necessary to put an except condition (see below)
         if fan_on():
             time.sleep(flushing_time)
             if laser_on():
-                data = read_histogram(sampling_time)
+                to_return = read_histogram(sampling_time)
+            else:
+                logger.critical("Skipping histogram reading")
             laser_off()
+        else:
+            logger.critical("Skipping histogram reading")
         fan_off()
-        return data
+        return to_return
 
     except SystemExit or KeyboardInterrupt:  # in case of error AND if user stop the software
         logger.info("Python instance has been stopped, shutting laser and fan OFF...")
@@ -619,10 +714,10 @@ def join_bytes(list_of_bytes):
     return val
 
 
-if __name__ == '__name__':
+if __name__ == '__main__':
     # The code below runs if you execute this code from this file (you must execute OPC-N3 and not seacanairy)
     logger.debug("Code is running from the OPC-N3 file itself, debug messages shown")
-    print(message_level)
-    getdata(2, 5)
-    print("waiting...")
+    answer = getdata(OPC_flushing_time, OPC_sampling_time)
+    print(answer)
+    print("waiting 10 seconds...")
     time.sleep(10)
