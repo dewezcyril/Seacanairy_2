@@ -1,0 +1,26 @@
+# SEACANAIRY CONFIGURATION FILE
+
+
+Seacanairy settings:
+  # Name of the folder in which the log and data files will be stored:
+  Sampling session name: "seacanairy" #.csv
+  # Amount of time between each consecutive measurement
+  Sampling period: 60  # seconds
+
+
+CO2 sensor:
+  Automatic sampling frequency (number of sample during the above sampling period): 1
+  Amount of time required for the sensor to take the measurement: 10  # seconds (Default value: 10 seconds)
+  Store debug messages (important increase of logs): No
+
+
+
+OPC-N3 sensor:
+  # Amount of time at which the fan keep running to refresh the air inside the sensor casing
+  Flushing time: 2
+  # Amount of time at which the laser is kept on and measure the air
+    # This period will be multiplied by 2 because the sensor automatically take a
+    # measurement in high gain and in low gain mode
+  Sampling time: 5
+  Keep a record of all the technical data: Yes # bin number, sampling period, MToF...
+  Store debug messages (important increase of logs): No
