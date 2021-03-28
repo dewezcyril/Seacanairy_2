@@ -10,6 +10,7 @@ _CO2.py_ is working good and very accurate.
 * **Start_to_tshirp.py**: code to retrieve the voltage of a [4 sensors AFE board from Alphasense](http://www.alphasense.com/index.php/products/support-circuits-air/), measured by a [Pi-16ADC](https://alchemy-power.com/pi-16adc/)
 * **ADC and 4-AFE Board.py**: adaptation of the previous code for use via functions
 * **seacanairy.py**: final code launching the functions inside the other python files
+* **seacanairy_settings.yaml**: file containing the settings for the other files
 * _**draft.py**: draft document where ideas and non-used part of code are stored_
 # Link to the official documentation
 ### E+E Elektronik EE894 CO2 sensor
