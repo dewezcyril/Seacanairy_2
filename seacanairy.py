@@ -146,7 +146,7 @@ while True:
     print("********* CO2 SENSOR *********")
     CO2_data = CO2.get_data()
 
-    print("********* OPC-N3 *********")
+    print("*********** OPC-N3 ***********")
     OPC_data = OPCN3.getdata(OPC_flushing_time, OPC_sampling_time)
 
     print("  ")

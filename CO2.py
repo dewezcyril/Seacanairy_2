@@ -357,6 +357,8 @@ def internal_timestamp(new_timestamp=None):
             logger.info(
                 "Internal measuring time interval set successfully on " + str(int(measuring_time_interval)) + " seconds")
         return measuring_time_interval
+    else:
+        logger.error("Failed in changing internal timestamp to " + str(new_timestamp) + " seconds")
 
 
 def status(print_information=True):
@@ -388,7 +390,7 @@ def status(print_information=True):
     return [CO2_status, temperature_status, humidity_status]
 
 
-def trigger_measurement(wait_for_available_measurement=True):
+def trigger_measurement(let_time_to_sensor_to_measure=True):
     """
     Ask the CO2 sensor to start a new measurement now if the previous one is older than 10 seconds
     Same function as 'status()'
@@ -397,7 +399,7 @@ def trigger_measurement(wait_for_available_measurement=True):
     """
     logger.info("Triggering a new measurement...")
     sensor_status = status(False)
-    if wait_for_available_measurement:  # if user/software want to wait for the data to be ready
+    if let_time_to_sensor_to_measure:  # if user/software want to wait for the data to be ready
         logger.info("Waiting " + str(measurement_delay) + " seconds for sensor to take measurement")
         time.sleep(measurement_delay)  # sensor documentation, let time to the sensor to perform the measurement
     return sensor_status  # same function as 'status()', but here we don't want to print the status on the screen
