@@ -408,9 +408,9 @@ def check(checksum, *data):
     :param data: all the other bytes sent by the sensor
     :return:
     """
-    to_digest = []
-    for i in data:
-        to_digest.extend(i)
+    to_digest = [*data]
+    # for i in data:
+    #     to_digest.extend(i)
     if digest(to_digest) == join_bytes(checksum):
         log = "Checksum is correct"
         logger.debug(log)
@@ -518,8 +518,6 @@ def read_histogram(sampling_period):
         "PM 10": -255,
         "temperature": -255,
         "relative humidity": -255,
-        "bin": -255,
-        "MToF": -255,
         "sampling time": -255,
         "sample flow rate": -255,
         "reject count glitch": -255,
@@ -527,7 +525,35 @@ def read_histogram(sampling_period):
         "reject count ratio": -255,
         "reject count out of range": -255,
         "fan revolution count": -255,
-        "laser status": -255
+        "laser status": -255,
+        "bin 0": -255,
+        "bin 1": -255,
+        "bin 2": -255,
+        "bin 3": -255,
+        "bin 4": -255,
+        "bin 5": -255,
+        "bin 6": -255,
+        "bin 7": -255,
+        "bin 8": -255,
+        "bin 9": -255,
+        "bin 10": -255,
+        "bin 11": -255,
+        "bin 12": -255,
+        "bin 13": -255,
+        "bin 14": -255,
+        "bin 15": -255,
+        "bin 16": -255,
+        "bin 17": -255,
+        "bin 18": -255,
+        "bin 19": -255,
+        "bin 20": -255,
+        "bin 21": -255,
+        "bin 22": -255,
+        "bin 23": -255,
+        "bin 1 MToF": -255,
+        "bin 3 MToF": -255,
+        "bin 5 MToF": -255,
+        "bin 7 MToF": -255
     }
 
     # Delete old histogram data and start a new one
@@ -603,16 +629,59 @@ def read_histogram(sampling_period):
                 laser_status = join_bytes(laser_status)
                 print(" Laser status:", laser_status)
 
+                to_return = {
+                    "PM 1": PM1,
+                    "PM 2.5": PM25,
+                    "PM 10": PM10,
+                    "temperature": temperature,
+                    "relative humidity": relative_humidity,
+                    "sampling time": sampling_time,
+                    "sample flow rate": sample_flow_rate,
+                    "reject count glitch": reject_count_glitch,
+                    "reject count long TOF": reject_count_longTOF,
+                    "reject count ratio": reject_count_ratio,
+                    "reject count out of range": reject_count_Out_Of_Range,
+                    "fan revolution count": fan_rev_count,
+                    "laser status": laser_status,
+                    "bin 0": join_bytes(bin[0:1]),
+                    "bin 1": join_bytes(bin[2:3]),
+                    "bin 2": join_bytes(bin[4:5]),
+                    "bin 3": join_bytes(bin[6:7]),
+                    "bin 4": join_bytes(bin[8:9]),
+                    "bin 5": join_bytes(bin[10:11]),
+                    "bin 6": join_bytes(bin[12:13]),
+                    "bin 7": join_bytes(bin[14:15]),
+                    "bin 8": join_bytes(bin[16:17]),
+                    "bin 9": join_bytes(bin[18:19]),
+                    "bin 10": join_bytes(bin[20:21]),
+                    "bin 11": join_bytes(bin[22:23]),
+                    "bin 12": join_bytes(bin[24:25]),
+                    "bin 13": join_bytes(bin[26:27]),
+                    "bin 14": join_bytes(bin[28:29]),
+                    "bin 15": join_bytes(bin[30:31]),
+                    "bin 16": join_bytes(bin[32:33]),
+                    "bin 17": join_bytes(bin[34:35]),
+                    "bin 18": join_bytes(bin[36:37]),
+                    "bin 19": join_bytes(bin[38:39]),
+                    "bin 20": join_bytes(bin[40:41]),
+                    "bin 21": join_bytes(bin[42:43]),
+                    "bin 22": join_bytes(bin[44:45]),
+                    "bin 23": join_bytes(bin[46:47]),
+                    "bin 1 MToF": MToF[0],
+                    "bin 3 MToF": MToF[1],
+                    "bin 5 MToF": MToF[2],
+                    "bin 7 MToF": MToF[3],
+                }
+
                 print(" Bin number:\t", end='')
                 for i in range(0, 24):
-                    x = 2 * i
-                    y = x + 1
-                    answer = join_bytes(bin[x:y])
-                    print(answer, end=", ")
+                    print(to_return["bin " + str(i)], end=", ")
                 print("")  # go to next line
-                print(" MToF:\t\t", end='')
+                print(" MToF:\t\t")
+
                 for i in range(0, 4):
-                    print(MToF[i], end=", ")
+                    i = ( i * 2 ) + 1
+                    print(to_return["bin " + str(i) + " MToF"], end=", ")
                 print("")  # go to next line
 
                 if sampling_time > (sampling_period + 0.5):  # we tolerate a difference of 0.5 seconds
@@ -621,24 +690,6 @@ def read_histogram(sampling_period):
 
                 elif sampling_time < (sampling_period - 0.5):
                     logger.info("Sampling period of the sensor was " + str(round(sampling_period - sampling_time, 2)) + " seconds shorter than expected")
-
-                to_return = {
-                    "PM 1": PM1,
-                    "PM 2.5": PM25,
-                    "PM 10": PM10,
-                    "temperature": temperature,
-                    "relative humidity": relative_humidity,
-                    "bin": bin,
-                    "MToF": MToF,
-                    "sampling time": sampling_time,
-                    "sample flow rate": sample_flow_rate,
-                    "reject count glitch": reject_count_glitch,
-                    "reject count long TOF": reject_count_longTOF,
-                    "reject count ratio": reject_count_ratio,
-                    "reject count out of range": reject_count_Out_Of_Range,
-                    "fan revolution count": fan_rev_count,
-                    "laser status": laser_status
-                }
 
                 return to_return
 
