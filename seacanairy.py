@@ -124,6 +124,7 @@ def wait_timestamp(starting_time, finishing_time):
 # MAIN CODE
 # --------------------------------------------
 
+# INITIATION
 
 now = datetime.now()
 logger.info("Starting of Seacanairy on the " + str(now.strftime("%d/%m/%Y at %H:%M:%S")))
@@ -146,13 +147,20 @@ else:
                        "reject count glitch", "reject count long TOF", "reject count ratio",
                        "reject count out of range", "fan revolution count", "laser status")
 
-# Read the internal timestamp of the sensor, and change the value if necessary
+# Read the internal timestamp of the CO2 sensor, and change the value if necessary
 if CO2_sampling_period != CO2.internal_timestamp():
+    # If internal timestamp is not good, change it to the new value
     CO2.internal_timestamp(CO2_sampling_period)
 
+# ------ Following is to be improved...
+# Request the CO2 sensor to reset its internal counter and start measuring now
 CO2.trigger_measurement()
+
+# Wait the amount of time needed for the CO2 sensor to take the measurement
 time.sleep(settings['CO2 sensor']['Amount of time required for the sensor to take the measurement'])
-# it needs around 10 seconds to make the measurement
+# ------
+
+# LOOP
 
 while True:
     # Get date and time to store in the Excel file
