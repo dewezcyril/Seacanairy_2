@@ -1,17 +1,18 @@
 # Progression of my work
-_CO2.py_ is working good and very accurate.
+`CO2.py` and `OPCN3.py` are working good.
+**Currently working on the whole `seacanairy.py` file 
 
-**Currently** working on the OPC-N3 sensor
 # Description of the different files
 
-* **CO2.py**: retrieving the data from [E+E Elektronik EE894 CO2 sensor](https://www.epluse.com/en/products/co2-measurement/co2-sensor/ee894/)
-* **OPCN3.py**: code imported from an [online example](https://github.com/JarvisSan22/OPC-N3_python), to retrieve the data from the [Alphasense PM OPC-N3 sensor](http://www.alphasense.com/index.php/products/optical-particle-counter/)*
-* **OPCN3-spidev**: adaptation of the previous file found on GitHub. Use of spidev function instead of Serial
-* **Start_to_tshirp.py**: code to retrieve the voltage of a [4 sensors AFE board from Alphasense](http://www.alphasense.com/index.php/products/support-circuits-air/), measured by a [Pi-16ADC](https://alchemy-power.com/pi-16adc/)
-* **ADC and 4-AFE Board.py**: adaptation of the previous code for use via functions
-* **seacanairy.py**: final code launching the functions inside the other python files
-* **seacanairy_settings.yaml**: file containing the settings for the other files
-* _**draft.py**: draft document where ideas and non-used part of code are stored_
+* **`CO2.py`**: retrieving the data from [E+E Elektronik EE894 CO2 sensor](https://www.epluse.com/en/products/co2-measurement/co2-sensor/ee894/)
+* **`OPCN3.py`**: code imported from an [online example](https://github.com/JarvisSan22/OPC-N3_python), to retrieve the data from the [Alphasense PM OPC-N3 sensor](http://www.alphasense.com/index.php/products/optical-particle-counter/)*
+* **`Start_to_tshirp.py`**: code to retrieve the voltage of a [4 sensors AFE board from Alphasense](http://www.alphasense.com/index.php/products/support-circuits-air/), measured by a [Pi-16ADC](https://alchemy-power.com/pi-16adc/)
+* **`AFE.py`**: adaptation of the previous code for use via functions
+* **`seacanairy.py`**: final code launching the functions inside the other python files
+* **`seacanairy_settings.yaml`**: file containing the settings for the other files
+* _**`draft.py`**: draft document where ideas and non-used part of code are stored_
+
+_Other files are no more used_
 # Link to the official documentation
 ### E+E Elektronik EE894 CO2 sensor
 * [Utilising the E2 Interface for EE894 - AN1808-1 (296.53 kb)](https://www.epluse.com/fileadmin/data/product/ee894/Utilising_E2_Interface_EE894_AN1808-1.pdf)
@@ -25,5 +26,5 @@ _CO2.py_ is working good and very accurate.
 
 Cyril Dewez,
 21 years old,
-Student in Master year at the Antwerp Maritime Academy (Belgium).
+Student in Master year at the Antwerp Maritime Academy (Belgium),
 dewezcyril@gmail.com
