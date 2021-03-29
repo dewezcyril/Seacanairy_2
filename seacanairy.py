@@ -78,35 +78,44 @@ def append_data_to_csv(*data_to_write):
     :param data_to_write: List
     :return:
     """
-    to_write = []
-    for arg in data_to_write:
-        to_write.append(arg)
+    # Concatenate all the arguments in one list
+    to_write = [*data_to_write]
+
+    # Iterate for every argument in the brackets
+    # for arg in data_to_write:
+    #     to_write.append(arg)
     with open(path_csv, mode='a', newline='') as csv_file:
         writer = csv.writer(csv_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
         writer.writerow(to_write)
-    csv_file.close()
+    csv_file.close()  # close file after use(general safety practice)
 
 
-def wait_timestamp(starting_time, finish_time):
+def wait_timestamp(starting_time, finishing_time):
     """
     Wait that the sampling period is passed out to start the next measurement
-    :param starting_time: time at which the measurement has started
+    :param starting_time: time at which the measurement has started ('time.time()' required)
+    :param finishing_time: time at which the measurement has finished ('time.time()' required)
     :return: Function stop when next measurement can start
     """
-    next_launching = starting_time + sampling_period
-    to_wait = round(sampling_period - (finish_time - starting_time), 0)
-    if finish_time >= next_launching:
-        log = "Measurement took more time than required (" + str(round(sampling_period, 0)) + " seconds)"
-        logger.error(log)
+    next_launching = starting_time + sampling_period  # time at which the next sample should start
+    to_wait = round(sampling_period - (finishing_time - starting_time), 0)  # amount of time system will wait
+
+    # if the sampling process took more time than the sampling period
+    if finishing_time >= next_launching:
+        logger.error("Measurement took more time than required (" + str(round(sampling_period, 0)) + " seconds)")
         return
+
+    # As long as the current time is smaller than the starting time...
     while time.time() < next_launching:
-        time.sleep(0.5)
         for i in range(0, int(to_wait)):
             print("Waiting before next measurement: ", int(to_wait) - i, "seconds (sampling time is set on",
                   sampling_period,
                   "seconds)", end="\r")
-            time.sleep(1)
-    print("                                                                                    ")  # to go to next line
+            time.sleep(1)  # refresh rate of the counter, 'while' condition will break when time is out
+
+    # Delete the waiting countdown and skip a line
+    # Print a whole blank to remove completely the previous line ("Waiting before next measurement...")
+    print("                                                                                    ")
     print("Starting new sample...")
     return
 
@@ -124,11 +133,18 @@ if os.path.isfile(path_csv):
     logger.info("'" + str(path_csv) + "' already exist, appending data to this file")
 else:
     logger.info("Initiating '" + str(project_name) + "' file")
-    append_data_to_csv("Date/Time", "Relative Humidity", "Temperature", "Pressure", "CO2 average", "CO2 instant",
-                       "PM 1", "PM 2.5", "PM 10", "Temperature OPC", "Relative Humidity OPC",
-                       "bin", "MToF", "Sampling Time", "Sample flow rate",
-                       "reject count glitch", "reject count long TOF", "reject count ratio", "reject count out of range",
-                       "fan revolution count", "laser status")
+    append_data_to_csv("Date/Time", "Relative Humidity", "Temperature", "Pressure",
+                       "CO2 average", "CO2 instant",
+                       "PM 1", "PM 2.5", "PM 10",
+                       "Temperature OPC", "Relative Humidity OPC",
+                       "sampling time OPC", "sample flow rate OPC",
+                       "bin 0", "bin 1", "bin 2", "bin 3", "bin 4", "bin 5",
+                       "bin 6", "bin 7", "bin 8", "bin 9", "bin 10", "bin 11",
+                       "bin 12", "bin 13", "bin 14", "bin 15", "bin 16", "bin 17",
+                       "bin 18", "bin 19", "bin 20", "bin 21", "bin 22", "bin 23",
+                       "bin 1 MToF", "bin 3 MToF", "bin 5 MToF", "bin 7 MToF",
+                       "reject count glitch", "reject count long TOF", "reject count ratio",
+                       "reject count out of range", "fan revolution count", "laser status")
 
 # Read the internal timestamp of the sensor, and change the value if necessary
 if CO2_sampling_period != CO2.internal_timestamp():
@@ -139,30 +155,58 @@ time.sleep(settings['CO2 sensor']['Amount of time required for the sensor to tak
 # it needs around 10 seconds to make the measurement
 
 while True:
+    # Get date and time to store in the Excel file
     now = datetime.now()
+    now = now.strftime("%Y-%m-%d %H:%M:%S")
 
-    start = time.time()
+    # Get the time in second at which the measurement start
+    start = time.time()  # return the time expressed in second since the python date reference
+    # a bit the same as 'millis()' on Arduino
+    # easier to work with than with a complex datetime format and a timedelta function...
 
+    # Get CO2 sensor data (see 'CO2.py')
     print("********* CO2 SENSOR *********")
     CO2_data = CO2.get_data()
 
+    # Get OPC-N3 sensor data (see 'OPCN3.py')
     print("*********** OPC-N3 ***********")
     OPC_data = OPCN3.getdata(OPC_flushing_time, OPC_sampling_time)
 
-    print("  ")
+    # Save the data in the .csv file
     print("Saving data in", path_csv)
+    # If user want to store all the technical data (for the OPCN3, bin, MToF...)
     if OPC_keep_all_data:
-        append_data_to_csv(now, CO2_data["relative humidity"], CO2_data["temperature"], CO2_data["average"], CO2_data["instant"],
-                           OPC_data["PM 1"], OPC_data["PM 2.5"], OPC_data["PM 10"], OPC_data["temperature"], OPC_data["relative humidity"],
-                           OPC_data["bin"],
-                           OPC_data["MToF"], OPC_data["sampling time"], OPC_data["sample flow rate"], OPC_data["reject count glitch"],
-                           OPC_data["reject count long TOF"], OPC_data["reject count ratio"], OPC_data["reject count out of range"], OPC_data["fan revolution count"], OPC_data["laser status"])
+        append_data_to_csv(now, CO2_data["relative humidity"], CO2_data["temperature"], CO2_data["pressure"],
+                           CO2_data["average"], CO2_data["instant"],
+                           OPC_data["PM 1"], OPC_data["PM 2.5"], OPC_data["PM 10"],
+                           OPC_data["temperature"], OPC_data["relative humidity"],
+                           OPC_data["sampling time"], OPC_data["sample flow rate"],
+                           OPC_data["bin 0"], OPC_data["bin 1"], OPC_data["bin 2"], OPC_data["bin 3"],
+                           OPC_data["bin 4"], OPC_data["bin 5"], OPC_data["bin 6"], OPC_data["bin 7"],
+                           OPC_data["bin 8"], OPC_data["bin 9"], OPC_data["bin 10"], OPC_data["bin 11"],
+                           OPC_data["bin 12"], OPC_data["bin 13"], OPC_data["bin 14"], OPC_data["bin 15"],
+                           OPC_data["bin 16"], OPC_data["bin 17"], OPC_data["bin 18"], OPC_data["bin 19"],
+                           OPC_data["bin 20"], OPC_data["bin 21"], OPC_data["bin 22"], OPC_data["bin 23"],
+                           OPC_data["bin 1 MToF"], OPC_data["bin 3 MToF"],
+                           OPC_data["bin 5 MToF"], OPC_data["bin 7 MToF"],
+                           OPC_data["reject count glitch"],
+                           OPC_data["reject count long TOF"], OPC_data["reject count ratio"],
+                           OPC_data["reject count out of range"],
+                           OPC_data["fan revolution count"], OPC_data["laser status"])
+    # If user do not want to store all those technical data
     else:
-        append_data_to_csv(now, CO2_data["relative humidity"], CO2_data["temperature"], CO2_data["average"], CO2_data["instant"],
-                           OPC_data["PM 1"], OPC_data["PM 2.5"], OPC_data["PM 10"], OPC_data["temperature"], OPC_data["relative humidity"])
+        append_data_to_csv(now, CO2_data["relative humidity"], CO2_data["temperature"], CO2_data["pressure"],
+                           CO2_data["average"], CO2_data["instant"],
+                           OPC_data["PM 1"], OPC_data["PM 2.5"], OPC_data["PM 10"],
+                           OPC_data["temperature"], OPC_data["relative humidity"],
+                           OPC_data["sampling time"], OPC_data["sample flow rate"])
 
-    finish = time.time()
-    log = "Sampling finished in " + str(round(finish - start, 0)) + " seconds"
-    logger.info(log)
+    # Time at which the sampling finishes
+    finish = time.time()  # as previously, expressed in seconds since reference date
 
+    # Calculate the amount of time the sampling process took, round to 0 to avoid decimals
+    # int(...) to delete the remaining 0 behind the coma
+    logger.info("Sampling finished in " + str(int(round(finish - start, 0))) + " seconds")
+
+    # Wait that the minute is passed
     wait_timestamp(start, finish)
