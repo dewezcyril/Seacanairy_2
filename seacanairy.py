@@ -99,6 +99,7 @@ def wait_timestamp(starting_time, finishing_time):
     :param finishing_time: time at which the measurement has finished ('time.time()' required)
     :return: Function stop when next measurement can start
     """
+    finishing_time = time.time()
     next_launching = starting_time + sampling_period  # time at which the next sample should start
     to_wait = round(next_launching - finishing_time, 0)  # amount of time system will wait
 
