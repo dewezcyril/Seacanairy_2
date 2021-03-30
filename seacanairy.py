@@ -39,6 +39,8 @@ OPC_sampling_time = settings['OPC-N3 sensor']['Sampling time']
 
 OPC_keep_all_data = settings['OPC-N3 sensor']['Keep a record of all the technical data']
 
+OPC_fan_speed = settings['OPC-N3 sensor']['Fan speed']
+
 path_csv = project_name + ".csv"
 
 # -----------------------------------------
@@ -98,7 +100,7 @@ def wait_timestamp(starting_time, finishing_time):
     :return: Function stop when next measurement can start
     """
     next_launching = starting_time + sampling_period  # time at which the next sample should start
-    to_wait = round(sampling_period - (finishing_time - starting_time), 0)  # amount of time system will wait
+    to_wait = round(next_launching - finishing_time, 0)  # amount of time system will wait
 
     # if the sampling process took more time than the sampling period
     if finishing_time >= next_launching:
@@ -106,13 +108,14 @@ def wait_timestamp(starting_time, finishing_time):
         return
 
     # As long as the current time is smaller than the starting time...
-    while time.time() < next_launching:
-        for i in range(0, int(to_wait)):
+    for i in range(0, int(to_wait)):
+        if time.time() < next_launching:
             print("Waiting before next measurement: ", int(to_wait) - i, "seconds (sampling time is set on",
                   sampling_period,
                   "seconds)", end="\r")
-            time.sleep(1)  # refresh rate of the counter, 'while' condition will break when time is out
-
+            time.sleep(1)
+        else:
+            break
     # Delete the waiting countdown and skip a line
     # Print a whole blank to remove completely the previous line ("Waiting before next measurement...")
     print("                                                                                    ")
@@ -151,6 +154,9 @@ else:
 if CO2_sampling_period != CO2.internal_timestamp():
     # If internal timestamp is not good, change it to the new value
     CO2.internal_timestamp(CO2_sampling_period)
+
+# Set the desired fan speed
+OPCN3.set_fan_speed(OPC_fan_speed)
 
 # ------ Following is to be improved...
 # Request the CO2 sensor to reset its internal counter and start measuring now

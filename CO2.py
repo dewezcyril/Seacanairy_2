@@ -10,6 +10,9 @@ Libraries for the use of E+E Elektronik EE894 CO2 sensor via I²C communication
 import time
 from datetime import date, datetime
 
+# Get the errors
+import sys
+
 # smbus2 is the new smbus, allow more than 32 bits writing/reading
 from smbus2 import SMBus, i2c_msg
 
@@ -198,12 +201,12 @@ def getRHT():
 
             except:  # what happens if the i2c fails
                 if reading_trials == max_attempts:
-                    log = "RH and temperature lecture from CO2 sensor aborted. (" + str(max_attempts) + "/" + str(max_attempts) + ") i2c transmission problem."
-                    logger.critical(log)
+                    logger.critical("i2c transmission failed "
+                                    + str(max_attempts) + "consecutive times, skipping this RH and temperature reading")
                     return data  # indicate clearly that data are wrong
 
-                log = "Error in the i2c transmission, trying again... (" + str(reading_trials + 1) + "/" + str(max_attempts) + ")"
-                logger.error(log)
+                logger.error("Error in the i2c transmission (" + str(sys.exc_info()[0])
+                             + "), trying again... (" + str(reading_trials + 1) + "/" + str(max_attempts) + ")")
                 reading_trials += 1  # increment of reading_trials
                 time.sleep(2)  # if transmission fails, wait a bit to try again (sensor is maybe busy)
 
@@ -228,13 +231,15 @@ def getRHT():
 
         else:  # if one or both checksums are not corrects
             if attempts == max_attempts:
-                logger.error("Error in the data received (3/3), temperature and humidity reading skipped")
+                logger.error("Data were wrong "
+                             + str(max_attempts) + " consecutive times, skipping this RH and temperature reading")
                 return data  # indicate on the SD card that data are wrong
 
             else:
                 attempts += 1
-                logger.warning("Error in the data received, trying again... (" + str(attempts) + "/3)")
-                time.sleep(1)  # avoid to close i2c communication
+                logger.warning("Error in the data received (wrong checksum), reading data again... ("
+                               + str(attempts) + "/" + str(max_attempts) + ")")
+                time.sleep(2)  # avoid to close i2c communication
 
 
 def getCO2P():
@@ -272,10 +277,12 @@ def getCO2P():
 
             except:  # what happens if the i2c fails
                 if reading_trials == max_attempts:
-                    logger.critical("RH and temperature lecture from CO2 sensor aborted. i2c transmission problem.")
+                    logger.critical("i2c transmission failed "
+                                    + str(max_attempts) + " consecutive times, skipping this CO2 and pressure reading")
                     return data  # indicate clearly that the data are wrong
 
-                logger.error("Error in the i2c transmission, trying again... (" + str(reading_trials + 1) + "/3)")
+                logger.error("Error in the i2c transmission, trying again... (" +
+                             str(reading_trials + 1) + "/" + str(max_attempts) + ")")
                 reading_trials += 1  # increment of reading_trials
                 time.sleep(1)  # if I²C comm fails, wait a little bit and try again (sensor is maybe busy)
 
@@ -303,12 +310,13 @@ def getCO2P():
 
         else:  # if one or both checksums are not corrects
             if attempts == max_attempts:
-                logger.error("Error in the data received. CO2 and pressure reading aborted")
+                logger.error("Error in the data received (wrong checksum), skipping this CO2 and pressure reading")
                 return data  # indicate clearly that the data are wrong
 
             else:
                 attempts += 1
-                logger.warning("Error in the data received. Reading data again... (" + str(attempts) + "/3)")
+                logger.warning("Error in the data received (wrong checksum), reading data again... (" +
+                               str(attempts) + "/" + str(max_attempts) + ")")
                 time.sleep(1)  # avoid too close i2c communication
 
 
@@ -357,7 +365,7 @@ def internal_timestamp(new_timestamp=None):
                 "Internal measuring time interval set successfully on " + str(int(measuring_time_interval)) + " seconds")
         return measuring_time_interval
     else:
-        logger.error("Failed in changing internal timestamp to " + str(new_timestamp) + " seconds")
+        logger.error("Failed to change the internal timestamp to " + str(new_timestamp) + " seconds")
 
 
 def status(print_information=True):

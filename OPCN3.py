@@ -31,6 +31,10 @@ OPC_flushing_time = settings['OPC-N3 sensor']['Flushing time']
 
 OPC_sampling_time = settings['OPC-N3 sensor']['Sampling time']
 
+take_new_sample_if_checksum_is_wrong = \
+    settings['OPC-N3 sensor'][
+        'Take a new measurement if checksum is wrong (avoid shorter sampling periods when errors)']
+
 # --------------------------------------------------------
 # LOGGING SETTINGS
 # --------------------------------------------------------
@@ -38,7 +42,6 @@ OPC_sampling_time = settings['OPC-N3 sensor']['Sampling time']
 # logging = tak a trace of some messages in a file to be reviewed afterward (check for errors fe)
 
 import logging
-
 
 if __name__ == '__main__':  # if you run this code directly ($ python3 CO2.py)
     message_level = logging.DEBUG  # show ALL the logging messages
@@ -63,7 +66,6 @@ else:  # if this file is considered as a library (if you execute 'seacanairy.py'
         message_level = logging.INFO
     log_file = '/home/pi/seacanairy_project/log/' + project_name + '.log'  # complete location needed on the RPI
     # no need to add a handler, because there is already one in seacanairy.py
-
 
 # set up logging to file
 logging.basicConfig(level=message_level,
@@ -95,6 +97,8 @@ wait_10_milli = 0.015  # 15 ms
 wait_10_micro = 1e-06
 wait_reset_SPI_buffer = 3  # seconds
 time_available_for_initiate_transmission = 10  # seconds - amount of time for the system to initiate transmission
+
+
 # if the sensor is disconnected, it can happen that the RPi wait for its answer, which never comes...
 # avoid the system to wait for unlimited time for that answer
 
@@ -159,7 +163,9 @@ def initiate_transmission(command_byte):
             return False
 
         else:
-            logger.critical("Failed to initiate transmission (unexpected code returned: " + str(hex(reading[0])) + ") (" + str(cycle) + "/3)")
+            logger.critical(
+                "Failed to initiate transmission (unexpected code returned: " + str(hex(reading[0])) + ") (" + str(
+                    cycle) + "/3)")
             time.sleep(wait_reset_SPI_buffer)
             cycle += 1  # increment of attempts
 
@@ -408,16 +414,16 @@ def check(checksum, *data):
     :param data: all the other bytes sent by the sensor
     :return:
     """
-    to_digest = [*data]
-    # for i in data:
-    #     to_digest.extend(i)
+    to_digest = []
+    for i in data:
+        to_digest.extend(i)
     if digest(to_digest) == join_bytes(checksum):
         log = "Checksum is correct"
         logger.debug(log)
         return True
     else:
         log = "Checksum is wrong"
-        logger.error(log)
+        logger.debug(log)
         return False
 
 
@@ -469,7 +475,7 @@ def PM_reading():
             if attempts >= 4:
                 log = "PM data wrong 3 consecutive times, skipping PM measurement"
                 logger.critical(log)
-                return [-255, -255, -255]
+                return ["error", "error", "error"]
             else:
                 attempts += 1
                 log = "Checksum for PM data is not correct, reading again (" + str(attempts) + "/3)"
@@ -513,47 +519,47 @@ def read_histogram(sampling_period):
 
     # Create a dictionary containing data to be returned in case of error
     to_return = {
-        "PM 1": -255,
-        "PM 2.5": -255,
-        "PM 10": -255,
-        "temperature": -255,
-        "relative humidity": -255,
-        "sampling time": -255,
-        "sample flow rate": -255,
-        "reject count glitch": -255,
-        "reject count long TOF": -255,
-        "reject count ratio": -255,
-        "reject count out of range": -255,
-        "fan revolution count": -255,
-        "laser status": -255,
-        "bin 0": -255,
-        "bin 1": -255,
-        "bin 2": -255,
-        "bin 3": -255,
-        "bin 4": -255,
-        "bin 5": -255,
-        "bin 6": -255,
-        "bin 7": -255,
-        "bin 8": -255,
-        "bin 9": -255,
-        "bin 10": -255,
-        "bin 11": -255,
-        "bin 12": -255,
-        "bin 13": -255,
-        "bin 14": -255,
-        "bin 15": -255,
-        "bin 16": -255,
-        "bin 17": -255,
-        "bin 18": -255,
-        "bin 19": -255,
-        "bin 20": -255,
-        "bin 21": -255,
-        "bin 22": -255,
-        "bin 23": -255,
-        "bin 1 MToF": -255,
-        "bin 3 MToF": -255,
-        "bin 5 MToF": -255,
-        "bin 7 MToF": -255
+        "PM 1": "error",
+        "PM 2.5": "error",
+        "PM 10": "error",
+        "temperature": "error",
+        "relative humidity": "error",
+        "sampling time": "error",
+        "sample flow rate": "error",
+        "reject count glitch": "error",
+        "reject count long TOF": "error",
+        "reject count ratio": "error",
+        "reject count out of range": "error",
+        "fan revolution count": "error",
+        "laser status": "error",
+        "bin 0": "error",
+        "bin 1": "error",
+        "bin 2": "error",
+        "bin 3": "error",
+        "bin 4": "error",
+        "bin 5": "error",
+        "bin 6": "error",
+        "bin 7": "error",
+        "bin 8": "error",
+        "bin 9": "error",
+        "bin 10": "error",
+        "bin 11": "error",
+        "bin 12": "error",
+        "bin 13": "error",
+        "bin 14": "error",
+        "bin 15": "error",
+        "bin 16": "error",
+        "bin 17": "error",
+        "bin 18": "error",
+        "bin 19": "error",
+        "bin 20": "error",
+        "bin 21": "error",
+        "bin 22": "error",
+        "bin 23": "error",
+        "bin 1 MToF": "error",
+        "bin 3 MToF": "error",
+        "bin 5 MToF": "error",
+        "bin 7 MToF": "error"
     }
 
     # Delete old histogram data and start a new one
@@ -569,10 +575,14 @@ def read_histogram(sampling_period):
     # the sampling time given by the OPC-N3 respects your sampling time wishes
     # first 5 seconds are with low gain, and the next seconds are with high gain (automatically performed by OPC-N3)
 
-    loading_bar('Sampling', delay)
+    if not take_new_sample_if_checksum_is_wrong:
+        loading_bar('Sampling', delay)
 
     attempts = 1  # reset the counter for next measurement
     while attempts < 4:
+        if take_new_sample_if_checksum_is_wrong:
+            loading_bar('Sampling', delay)
+
         if initiate_transmission(0x30):
             # read all the bytes and store them in a dedicated variable
             bin = spi.xfer([0x30] * 48)
@@ -603,18 +613,19 @@ def read_histogram(sampling_period):
                 PM1 = round(struct.unpack('f', bytes(PM_A))[0], 2)
                 PM25 = round(struct.unpack('f', bytes(PM_B))[0], 2)
                 PM10 = round(struct.unpack('f', bytes(PM_C))[0], 2)
-                print("PM 1:\t", PM1, " mg/m3", end = "\t\t|\t")
-                print("PM 2.5:\t", PM25, " mg/m3", end = "\t\t|\t")
+                print("PM 1:\t", PM1, " mg/m3", end="\t\t|\t")
+                print("PM 2.5:\t", PM25, " mg/m3", end="\t\t|\t")
                 print("PM 10:\t", PM10, " mg/m3")
 
                 relative_humidity = round(100 * (join_bytes(relative_humidity) / (2 ** 16 - 1)), 2)
                 temperature = round(-45 + 175 * (join_bytes(temperature) / (2 ** 16 - 1)), 2)  # conversion in °C
-                print("Temperature:", temperature, " °C (PCB Board)\t| \tRelative Humidity:", relative_humidity, " %RH (PCB Board)")
+                print("Temperature:", temperature, " °C (PCB Board)\t| \tRelative Humidity:", relative_humidity,
+                      " %RH (PCB Board)")
 
                 sampling_time = join_bytes(sampling_time) / 100
                 print(" Sampling period:", sampling_time, "seconds", end="\t\t|\t")
                 sample_flow_rate = join_bytes(sample_flow_rate) / 100
-                print(" Sampling flow rate:", sample_flow_rate, "ml/s |", round(sample_flow_rate * 60 / 1000, 2),"L/min")
+                print(" Sampling flow rate:", sample_flow_rate, "ml/s |", round(sample_flow_rate * 60, 2), "mL/min")
 
                 reject_count_glitch = join_bytes(reject_count_glitch)
                 print(" Reject count glitch:", reject_count_glitch, end="\t\t|\t")
@@ -680,23 +691,24 @@ def read_histogram(sampling_period):
                 print(" MToF:\t\t")
 
                 for i in range(0, 4):
-                    i = ( i * 2 ) + 1
+                    i = (i * 2) + 1
                     print(to_return["bin " + str(i) + " MToF"], end=", ")
                 print("")  # go to next line
 
                 if sampling_time > (sampling_period + 0.5):  # we tolerate a difference of 0.5 seconds
-                    log = "Sampling period of the sensor was " + str(round(sampling_time - sampling_period, 2)) + " seconds longer than expected"
-                    logger.info(log)
+                    log = "Sampling period of the sensor was " \
+                          + str(round(sampling_time - sampling_period, 2)) + " seconds longer than expected"
+                    logger.warning(log)
 
                 elif sampling_time < (sampling_period - 0.5):
-                    logger.info("Sampling period of the sensor was " + str(round(sampling_period - sampling_time, 2)) + " seconds shorter than expected")
+                    logger.warning("Sampling period of the sensor was "
+                                   + str(round(sampling_period - sampling_time, 2)) + " seconds shorter than expected")
 
                 return to_return
 
             else:
                 # if the function with the checksum return an error (FALSE)
-                log = "Checksum is wrong, trying again to read the histogram (" + str(attempts) + "/3)"
-                logger.error(log)
+                logger.warning("Error in the data received (wrong checksum), reading histogram again... (" + str(attempts) + "/3)")
                 time.sleep(wait_reset_SPI_buffer)  # let some times between two SPI communications
                 attempts += 1
         else:
@@ -704,7 +716,7 @@ def read_histogram(sampling_period):
             return to_return
 
         if attempts >= 3:
-            logger.critical("Checksum was wrong 3 times, skipping this histogram reading")
+            logger.error("Data were wrong 3 times (wrong checksum), skipping this histogram reading")
             return to_return
 
 
@@ -715,29 +727,56 @@ def getdata(flushing_time, sampling_time):
     :param sampling_time: time during which the sensor is sampling
     :return: List[PM1, PM25, PM10, temperature, relative_humidity]
     """
-    # return -255 everywhere in case of error during the measurement
+    # return "error" everywhere in case of error during the measurement
     # seacanairy.py need that the dictionary is full of items, if not, python instance will stop
     to_return = {
-        "PM 1": -255,
-        "PM 2.5": -255,
-        "PM 10": -255,
-        "temperature": -255,
-        "relative humidity": -255,
-        "bin": -255,
-        "MToF": -255,
-        "sampling time": -255,
-        "sample flow rate": -255,
-        "reject count glitch": -255,
-        "reject count long TOF": -255,
-        "reject count ratio": -255,
-        "reject count out of range": -255,
-        "fan revolution count": -255,
-        "laser status": -255
+        "PM 1": "error",
+        "PM 2.5": "error",
+        "PM 10": "error",
+        "temperature": "error",
+        "relative humidity": "error",
+        "sampling time": "error",
+        "sample flow rate": "error",
+        "reject count glitch": "error",
+        "reject count long TOF": "error",
+        "reject count ratio": "error",
+        "reject count out of range": "error",
+        "fan revolution count": "error",
+        "laser status": "error",
+        "bin 0": "error",
+        "bin 1": "error",
+        "bin 2": "error",
+        "bin 3": "error",
+        "bin 4": "error",
+        "bin 5": "error",
+        "bin 6": "error",
+        "bin 7": "error",
+        "bin 8": "error",
+        "bin 9": "error",
+        "bin 10": "error",
+        "bin 11": "error",
+        "bin 12": "error",
+        "bin 13": "error",
+        "bin 14": "error",
+        "bin 15": "error",
+        "bin 16": "error",
+        "bin 17": "error",
+        "bin 18": "error",
+        "bin 19": "error",
+        "bin 20": "error",
+        "bin 21": "error",
+        "bin 22": "error",
+        "bin 23": "error",
+        "bin 1 MToF": "error",
+        "bin 3 MToF": "error",
+        "bin 5 MToF": "error",
+        "bin 7 MToF": "error"
     }
     try:  # necessary to put an except condition (see below)
         if fan_on():
-            time.sleep(flushing_time)
+            time.sleep(flushing_time/2)
             if laser_on():
+                time.sleep(flushing_time/2)
                 to_return = read_histogram(sampling_time)
             else:
                 logger.critical("Skipping histogram reading")
@@ -747,7 +786,7 @@ def getdata(flushing_time, sampling_time):
         fan_off()
         return to_return
 
-    except SystemExit or KeyboardInterrupt:  # in case of error AND if user stop the software
+    except:  # in case of error AND if user stop the software
         logger.info("Python instance has been stopped, shutting laser and fan OFF...")
         laser_off()
         fan_off()
@@ -766,10 +805,42 @@ def join_bytes(list_of_bytes):
     return val
 
 
+def set_fan_speed(speed):
+    """
+    Define the speed of the build in sensor fan
+    The goal is to avoid dust formation in the sensor due to high polluted air
+    :param speed: number between 0 and 100 (0 = slowest, 100 = fastest)
+    :return: nothing
+    """
+    if speed < 0 or speed > 100:
+        raise ValueError("Fan speed of OPC-N3 sensor must be a number between 0 and 100 (0 = slowest, 100 = fastest")
+    value = int((45 + speed / 100 * 55) / 100 * 255)
+    # Personal investigations shows that the fan don't work below 45%
+    # Formula makes a calculation to convert 0% as 45% --> easier for user input
+    if initiate_transmission(0x42):
+        reading = spi.xfer([0, value])
+        logger.info("Fan speed is set on " + str(speed) + " (0 = the slowest, 100 = the fastest)")
+    else:
+        logger.error("Failed to set the fan speed")
+
+
 if __name__ == '__main__':
     # The code below runs if you execute this code from this file (you must execute OPC-N3 and not seacanairy)
-    logger.debug("Code is running from the OPC-N3 file itself, debug messages shown")
-    answer = getdata(OPC_flushing_time, OPC_sampling_time)
-    print(answer)
-    print("waiting 10 seconds...")
-    time.sleep(10)
+    while True:
+        logger.debug("Code is running from the OPC-N3 file itself, debug messages shown")
+        print("Fan on 0")
+        set_fan_speed(0)
+        time.sleep(2)
+        fan_on()
+        time.sleep(3)
+        fan_off()
+        print("Fan on 100")
+        set_fan_speed(100)
+        time.sleep(2)
+        fan_on()
+        time.sleep(3)
+        fan_off()
+        # answer = getdata(OPC_flushing_time, OPC_sampling_time)
+        # print(answer)
+        # print("waiting 10 seconds...")
+        time.sleep(2)

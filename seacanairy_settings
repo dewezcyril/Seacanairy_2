@@ -10,17 +10,19 @@ Seacanairy settings:
 
 CO2 sensor:
   Automatic sampling frequency (number of sample during the above sampling period): 1
-  Amount of time required for the sensor to take the measurement: 10  # seconds (Default value: 10 seconds)
+  Amount of time required for the sensor to take the measurement: 8  # seconds (Default value: 10 seconds)
   Store debug messages (important increase of logs): No
-
+  Number of reading attempts: 3
 
 
 OPC-N3 sensor:
   # Amount of time at which the fan keep running to refresh the air inside the sensor casing
   Flushing time: 2
-  # Amount of time at which the laser is kept on and measure the air
+    # Amount of time at which the laser is kept on and measure the air
     # This period will be multiplied by 2 because the sensor automatically take a
-    # measurement in high gain and in low gain mode
+  # measurement in high gain and in low gain mode
   Sampling time: 5
+  Fan speed: 100 # 0 = the slowest, 100 = the fastest
   Keep a record of all the technical data: Yes # bin number, sampling period, MToF...
+  Take a new measurement if checksum is wrong (avoid shorter sampling periods when errors): Yes
   Store debug messages (important increase of logs): No
