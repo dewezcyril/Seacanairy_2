@@ -42,6 +42,8 @@ project_name = settings['Seacanairy settings']['Sampling session name']
 
 measurement_delay = settings['CO2 sensor']['Amount of time required for the sensor to take the measurement']
 
+max_attempts = settings['CO2 sensor']['Number of reading attempts']
+
 # --------------------------------------------------------
 # LOGGING SETTINGS
 # --------------------------------------------------------
@@ -154,14 +156,12 @@ def request_measurement():
         logger.debug("Reading status on the CO2 sensor")
 
         if (status != 0):
-            log = "CO2 sensor status is not ok. Value read is " + str(status)
-            logger.debug(log)
+            logger.debug("CO2 sensor status is not ok. Value read is " + str(status))
 
         return status
 
     except:
-        log = "Error while reading status of CO2 sensor via I²C"
-        logger.error(log)
+        logger.error("I²C error while reading status of CO2 sensor")
         return 255  # indicate that all the bytes are 1 (0b11111111)
 
 
@@ -173,8 +173,7 @@ def getRHT():
 
     :return:  Dictionary("RH", "temperature")
     """
-    log = "Reading RH and Temperature from CO2 sensor"
-    logger.debug(log)
+    logger.debug("Reading RH and Temperature from CO2 sensor")
 
     write = i2c_msg.write(CO2_address, [0xE0, 0x00])  # see documentation, example for reading t° and RH
     read = i2c_msg.read(CO2_address, 6)
@@ -182,28 +181,28 @@ def getRHT():
     attempts = 0  # trial counter for the checksum and the validity of the data received
     reading_trials = 0  # trial counter for the i2c communication
 
-    # In case there is a problem and it return nothing, return -255, which can be understood as an error
+    # In case there is a problem and it return nothing, return "error", which can be understood as an error
     data = {
-        "relative humidity": -255,
-        "temperature": -255
+        "relative humidity": "error",
+        "temperature": "error"
     }
 
     # all the following code is in a loop so that if the checksum is wrong, it start a new measurement
-    while attempts < 4:
+    while attempts <= max_attempts:
 
-        while reading_trials < 4:  # reading loop, will try again if the i2c communication fails
+        while reading_trials <= max_attempts:  # reading loop, will try again if the i2c communication fails
             try:  # SMBUS stop working in case of error, avoid the software to crash in case of i2c error
                 with SMBus(1) as bus:
                     bus.i2c_rdwr(write, read)
                 break  # break the loop if the try has not failed at the previous line, jump to the process of data
 
             except:  # what happens if the i2c fails
-                if reading_trials == 3:
-                    log = "RH and temperature lecture from CO2 sensor aborted. (3/3) i2c transmission problem."
+                if reading_trials == max_attempts:
+                    log = "RH and temperature lecture from CO2 sensor aborted. (" + str(max_attempts) + "/" + str(max_attempts) + ") i2c transmission problem."
                     logger.critical(log)
                     return data  # indicate clearly that data are wrong
 
-                log = "Error in the i2c transmission, trying again... (" + str(reading_trials + 1) + ")"
+                log = "Error in the i2c transmission, trying again... (" + str(reading_trials + 1) + "/" + str(max_attempts) + ")"
                 logger.error(log)
                 reading_trials += 1  # increment of reading_trials
                 time.sleep(2)  # if transmission fails, wait a bit to try again (sensor is maybe busy)
@@ -228,7 +227,7 @@ def getRHT():
             return data
 
         else:  # if one or both checksums are not corrects
-            if attempts == 3:
+            if attempts == max_attempts:
                 logger.error("Error in the data received (3/3), temperature and humidity reading skipped")
                 return data  # indicate on the SD card that data are wrong
 
@@ -255,24 +254,24 @@ def getCO2P():
     attempts = 0  # trial counter for the checksum and the validity of the data received
     reading_trials = 0  # trial counter for the i2c communication
 
-    # Create a dictionary containing the data, return -255 in case of error
+    # Create a dictionary containing the data, return "error" in case of error
     data = {
-        "average": -255,
-        "instant": -255,
-        "pressure": -255
+        "average": "error",
+        "instant": "error",
+        "pressure": "error"
     }
 
     # all the following code is in a loop so that if the checksum is wrong, it start a new measurement
-    while attempts < 4:
+    while attempts <= max_attempts:
 
-        while reading_trials < 4:  # reading loop, will try again if the i2c communication fails
+        while reading_trials <= max_attempts:  # reading loop, will try again if the i2c communication fails
             try:  # SMBUS stop working in case of error, avoid the software to crash in case of i2c error
                 with SMBus(1) as bus:
                     bus.i2c_rdwr(write, read)
                 break  # break the loop if the try has not failed at the previous line, jump to the process of data
 
             except:  # what happens if the i2c fails
-                if reading_trials == 3:
+                if reading_trials == max_attempts:
                     logger.critical("RH and temperature lecture from CO2 sensor aborted. i2c transmission problem.")
                     return data  # indicate clearly that the data are wrong
 
@@ -303,7 +302,7 @@ def getCO2P():
             return data
 
         else:  # if one or both checksums are not corrects
-            if attempts == 3:
+            if attempts == max_attempts:
                 logger.error("Error in the data received. CO2 and pressure reading aborted")
                 return data  # indicate clearly that the data are wrong
 
