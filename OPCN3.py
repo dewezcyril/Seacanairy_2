@@ -787,7 +787,7 @@ def getdata(flushing_time, sampling_time):
         return to_return
 
     except:  # in case of error AND if user stop the software
-        print("  ")
+        print("  ")  # go to the next line
         logger.info("Python instance has been stopped, shutting laser and fan OFF...")
         laser_off()
         fan_off()
