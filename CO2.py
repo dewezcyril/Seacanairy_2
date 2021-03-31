@@ -139,6 +139,9 @@ def check(checksum, data):
         return True
     else:
         logger.debug("CRC8 does not fit, data are wrong")
+        logger.error("Checksum is wrong, sensor checksum is: " + str(bytes(checksum)) +
+                     ", seacanairy checksum is: " + str(bytes(calculation)) +
+                     ", date returned by the sensor is :" + str(data))
         return False
 
 
