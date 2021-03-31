@@ -92,7 +92,7 @@ def append_data_to_csv(*data_to_write):
     csv_file.close()  # close file after use(general safety practice)
 
 
-def wait_timestamp(starting_time, finishing_time):
+def wait_timestamp(starting_time):
     """
     Wait that the sampling period is passed out to start the next measurement
     :param starting_time: time at which the measurement has started ('time.time()' required)
@@ -114,9 +114,8 @@ def wait_timestamp(starting_time, finishing_time):
             print("Waiting before next measurement: ", int(to_wait) - i, "seconds (sampling time is set on",
                   sampling_period,
                   "seconds)", end="\r")
-            time.sleep(1)
-        else:
-            break
+            time.sleep(.5)
+
     # Delete the waiting countdown and skip a line
     # Print a whole blank to remove completely the previous line ("Waiting before next measurement...")
     print("                                                                                    ")
@@ -130,13 +129,13 @@ def wait_timestamp(starting_time, finishing_time):
 
 # INITIATION
 
-now = datetime.now()
-logger.info("Starting of Seacanairy on the " + str(now.strftime("%d/%m/%Y at %H:%M:%S")))
+now = datetime.now()  # get time
+logger.info("Starting of Seacanairy on the " + str(now.strftime("%d/%m/%Y at %H:%M:%S")))  # delete time decimals
 
-# Check that the file exist, if not, write the first line (name of the columns)
-if os.path.isfile(path_csv):
+# Check that the data file exist, if not, write the first line (which is the columns' name)
+if os.path.isfile(path_csv):  # if file exist
     logger.info("'" + str(path_csv) + "' already exist, appending data to this file")
-else:
+else:  # if file doesn't exist
     logger.info("Initiating '" + str(project_name) + "' file")
     append_data_to_csv("Date/Time", "Relative Humidity", "Temperature", "Pressure",
                        "CO2 average", "CO2 instant",
@@ -152,20 +151,22 @@ else:
                        "reject count out of range", "fan revolution count", "laser status")
 
 # Read the internal timestamp of the CO2 sensor, and change the value if necessary
-if CO2_sampling_period != CO2.internal_timestamp():
-    # If internal timestamp is not good, change it to the new value
+if CO2_sampling_period != CO2.internal_timestamp():  # if internal timestamp is not the good one... change it
     CO2.internal_timestamp(CO2_sampling_period)
+    # nothing in the brackets = read, timestamp in the brackets = write
 
-# Set the desired fan speed
-OPCN3.set_fan_speed(OPC_fan_speed)
+# Set the desired OPC fan speed
+OPCN3.set_fan_speed(OPC_fan_speed)  # (check the sampling flow rate displayed by the sensor for seacanairy pump choice)
 
-# ------ Following is to be improved...
-# Request the CO2 sensor to reset its internal counter and start measuring now
-CO2.trigger_measurement()
+# Ask the CO2 sensor to take a new sample
+CO2.trigger_measurement(False)
+# The sensor will not take a new sample as long as the previous one is not older than 10 seconds
+time.sleep(11)  # wait a bit more than 10 seconds
+CO2.trigger_measurement(False)  # trigger new measurement
+# That way, we ensure that the sensor will trigger a new measurement RIGHT now
 
-# Wait the amount of time needed for the CO2 sensor to take the measurement
+# Wait the amount of time needed for the CO2 sensor to take the measurement (default 10 seconds in doc)
 time.sleep(settings['CO2 sensor']['Amount of time required for the sensor to take the measurement'])
-# ------
 
 # LOOP
 
@@ -223,5 +224,5 @@ while True:
     # int(...) to delete the remaining 0 behind the coma
     logger.info("Sampling finished in " + str(int(round(finish - start, 0))) + " seconds")
 
-    # Wait that the minute is passed
-    wait_timestamp(start, finish)
+    # Wait that the sampling period is passed
+    wait_timestamp(start)
