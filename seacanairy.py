@@ -114,7 +114,7 @@ def wait_timestamp(starting_time):
             print("Waiting before next measurement: ", int(to_wait) - i, "seconds (sampling time is set on",
                   sampling_period,
                   "seconds)", end="\r")
-            time.sleep(.5)
+            time.sleep(1)
 
     # Delete the waiting countdown and skip a line
     # Print a whole blank to remove completely the previous line ("Waiting before next measurement...")

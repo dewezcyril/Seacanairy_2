@@ -688,7 +688,7 @@ def read_histogram(sampling_period):
                 for i in range(0, 24):
                     print(to_return["bin " + str(i)], end=", ")
                 print("")  # go to next line
-                print(" MToF:\t\t")
+                print(" MToF:\t\t", end='')
 
                 for i in range(0, 4):
                     i = (i * 2) + 1

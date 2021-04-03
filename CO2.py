@@ -139,9 +139,9 @@ def check(checksum, data):
         return True
     else:
         logger.debug("CRC8 does not fit, data are wrong")
-        logger.error("Checksum is wrong, sensor checksum is: " + str(bytes(checksum)) +
-                     ", seacanairy checksum is: " + str(bytes(calculation)) +
-                     ", date returned by the sensor is :" + str(data))
+        logger.error("Checksum is wrong, sensor checksum is: " + str(checksum) +
+                     ", seacanairy checksum is: " + str(calculation) +
+                     ", data returned by the sensor is:" + str(data))
         return False
 
 
@@ -211,7 +211,7 @@ def getRHT():
                 logger.error("Error in the i2c transmission (" + str(sys.exc_info()[0])
                              + "), trying again... (" + str(reading_trials + 1) + "/" + str(max_attempts) + ")")
                 reading_trials += 1  # increment of reading_trials
-                time.sleep(2)  # if transmission fails, wait a bit to try again (sensor is maybe busy)
+                time.sleep(4)  # if transmission fails, wait a bit to try again (sensor is maybe busy)
 
         # process the data given by the sensor
         reading = list(read)
@@ -242,7 +242,7 @@ def getRHT():
                 attempts += 1
                 logger.warning("Error in the data received (wrong checksum), reading data again... ("
                                + str(attempts) + "/" + str(max_attempts) + ")")
-                time.sleep(2)  # avoid to close i2c communication
+                time.sleep(4)  # avoid to close i2c communication
 
 
 def getCO2P():
@@ -287,7 +287,7 @@ def getCO2P():
                 logger.error("Error in the i2c transmission, trying again... (" +
                              str(reading_trials + 1) + "/" + str(max_attempts) + ")")
                 reading_trials += 1  # increment of reading_trials
-                time.sleep(1)  # if I²C comm fails, wait a little bit and try again (sensor is maybe busy)
+                time.sleep(4)  # if I²C comm fails, wait a little bit and try again (sensor is maybe busy)
 
         # process the data given by the sensor
         reading = list(read)
@@ -320,7 +320,7 @@ def getCO2P():
                 attempts += 1
                 logger.warning("Error in the data received (wrong checksum), reading data again... (" +
                                str(attempts) + "/" + str(max_attempts) + ")")
-                time.sleep(1)  # avoid too close i2c communication
+                time.sleep(4)  # avoid too close i2c communication
 
 
 def get_data():
