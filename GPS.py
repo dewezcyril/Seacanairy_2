@@ -113,15 +113,17 @@ def clean_data(data):
     """
     data = data.split("\r\n")  # create a list of lines (\r\n is sent by the sensor at the end of each line)
     to_return = {
-        "fix time": "error",
-        "latitude": "error",
-        "longitude": "error",
-        "SOG": "error",
-        "COG": "error",
-        "status": "error",
-        "horizontal precision": "error",
-        "altitude": "error",
-        "WGS84 correction": "error"
+        "fix time": "unknown",
+        "latitude": "unknown",
+        "longitude": "unknown",
+        "SOG": "unknown",
+        "COG": "unknown",
+        "status": "unknown",
+        "horizontal precision": "unknown",
+        "altitude": "unknown",
+        "WGS84 correction": "unknown",
+        "UTC": "unknown",
+        "fix status": "unknown"
     }  # you must return all those items to avoid bugs in seacanairy.py (f-e looking for an item which doesn't exist)
     for i in range(len(data)):  # don't know at which line data will be send, so it will search for the good line
         if data[i][0:6] == "$GPRMC":
@@ -165,13 +167,29 @@ def clean_data(data):
         elif data[i][0:6] == "$GPGGA":
             if check(data[i]):
                 GPGGA = data[i].split(",")
+                UTC = GPGGA[1][0:2] + ":" + GPGGA[1][2:4] + ":" + GPGGA[1][4:6] + " UTC"
                 altitude = GPGGA[9] + " " + GPGGA[10]
                 WGS84_correction = GPGGA[11] + " " + GPGGA[12]
+                position_fix_status_indicator = GPGGA[6]
+                if position_fix_status_indicator == 0:
+                    fix_status = "No fix/invalid"
+                elif position_fix_status_indicator == 1:
+                    fix_status = "Standard GPS 2D/3D"
+                elif position_fix_status_indicator == 2:
+                    fix_status = "DGPS"
+                elif position_fix_status_indicator == 6:
+                    fix_status = "DR"
+                else:
+                    logger.error("Unknown position fix status indicator in GPGGA: " + str(position_fix_status_indicator))
+                    fix_status = "Unknown: " + str(position_fix_status_indicator)
 
                 to_return.update({
                     "altitude": altitude,
-                    "WGS84 correction": WGS84_correction
+                    "WGS84 correction": WGS84_correction,
+                    "fix status": fix_status,
+                    "UTC": UTC
                 })
+
     logger.debug("GPS reading is:" + str(to_return))
     return to_return
 
@@ -215,7 +233,8 @@ def check(NMEAstring):
 def get_position():
     """
     Get position and all other data from the GPS
-    :return:
+    :return:    Dictionary(fix time, latitude, longitude, SOG, COG, status,
+                horizontal precision, altitude, WGS84 correction)
     """
     logger.debug("Get position")
     reading = get_raw_reading()
@@ -224,7 +243,6 @@ def get_position():
     return data
 
 
-while True:
+if __name__ == '__main__':
     pos = get_position()
     print(pos)
-    time.sleep(5)
