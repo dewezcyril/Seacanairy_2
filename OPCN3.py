@@ -12,6 +12,8 @@ import os.path
 from progress.bar import IncrementalBar  # progress bar during sampling
 # import RPi.GPIO as GPIO
 
+import logging
+
 # yaml settings
 import yaml
 
@@ -41,13 +43,26 @@ take_new_sample_if_checksum_is_wrong = \
 # all the settings and other code for the logging
 # logging = tak a trace of some messages in a file to be reviewed afterward (check for errors fe)
 
-import logging
+
+def set_logger(message_level, log_file):
+    # set up logging to file
+    logging.basicConfig(level=message_level,
+                        format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
+                        datefmt='%d-%m %H:%M',
+                        filename=log_file,
+                        filemode='a')
+
+    logger = logging.getLogger('OPC-N3')  # name of the logger
+    # all further logging must be called by logger.'level' and not logging.'level'
+    # if not, the logging will be displayed as 'ROOT' and NOT 'OPC-N3'
+    return logger
+
 
 if __name__ == '__main__':  # if you run this code directly ($ python3 CO2.py)
     message_level = logging.DEBUG  # show ALL the logging messages
     log_file = '/home/pi/seacanairy_project/log/OPCN3-debug.log'  # complete file location required for the Raspberry
     print("DEBUG messages will be shown and stored in '" + str(log_file) + "'")
-
+    logger = set_logger(message_level, log_file)
     # define a Handler which writes INFO messages or higher to the sys.stderr/display
     console = logging.StreamHandler()
     console.setLevel(message_level)
@@ -66,17 +81,7 @@ else:  # if this file is considered as a library (if you execute 'seacanairy.py'
         message_level = logging.INFO
     log_file = '/home/pi/seacanairy_project/log/' + project_name + '.log'  # complete location needed on the RPI
     # no need to add a handler, because there is already one in seacanairy.py
-
-# set up logging to file
-logging.basicConfig(level=message_level,
-                    format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
-                    datefmt='%d-%m %H:%M',
-                    filename=log_file,
-                    filemode='a')
-
-logger = logging.getLogger('OPC-N3')  # name of the logger
-# all further logging must be called by logger.'level' and not logging.'level'
-# if not, the logging will be displayed as 'ROOT' and NOT 'OPC-N3'
+    logger = set_logger(message_level, log_file)
 
 
 # ----------------------------------------------

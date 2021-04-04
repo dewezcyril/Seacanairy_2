@@ -26,3 +26,7 @@ OPC-N3 sensor:
   Keep a record of all the technical data: Yes # bin number, sampling period, MToF...
   Take a new measurement if checksum is wrong (avoid shorter sampling periods when errors): Yes
   Store debug messages (important increase of logs): No
+
+
+GPS:
+  Store debug messages (important increase of logs): No

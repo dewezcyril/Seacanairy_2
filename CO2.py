@@ -56,7 +56,7 @@ max_attempts = settings['CO2 sensor']['Number of reading attempts']
 if __name__ == '__main__':  # if you run this code directly ($ python3 CO2.py)
     message_level = logging.DEBUG  # show ALL the logging messages
     log_file = '/home/pi/seacanairy_project/log/CO2-debug.log'  # complete file location required for the Raspberry
-    print("DEBUG messages will be shown and stored in '" + str(log_file) + "'")
+    print("CO2 Sensor DEBUG messages will be shown and stored in '" + str(log_file) + "'")
 
     # The following HANDLER must be activated ONLY if you run this code alone
     # Without the 'if __name__ == '__main__' condition, all the logging messages are displayed 3 TIMES
