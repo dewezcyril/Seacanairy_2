@@ -53,11 +53,24 @@ max_attempts = settings['CO2 sensor']['Number of reading attempts']
 # all the settings and other code for the logging
 # logging = tak a trace of some messages in a file to be reviewed afterward (check for errors fe)
 
+def set_logger(message_level, log_file):
+    # set up logging to file
+    logging.basicConfig(level=message_level,
+                        format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
+                        datefmt='%d-%m %H:%M',
+                        filename=log_file,
+                        filemode='a')
+
+    logger = logging.getLogger('CO2 sensor')  # name of the logger
+    # all further logging must be called by logger.'level' and not logging.'level'
+    # if not, the logging will be displayed as 'ROOT' and NOT 'OPC-N3'
+    return logger
+
 if __name__ == '__main__':  # if you run this code directly ($ python3 CO2.py)
     message_level = logging.DEBUG  # show ALL the logging messages
     log_file = '/home/pi/seacanairy_project/log/CO2-debug.log'  # complete file location required for the Raspberry
     print("CO2 Sensor DEBUG messages will be shown and stored in '" + str(log_file) + "'")
-
+    logger = set_logger(message_level, log_file)
     # The following HANDLER must be activated ONLY if you run this code alone
     # Without the 'if __name__ == '__main__' condition, all the logging messages are displayed 3 TIMES
     # (once for the handler in CO2.py, once for the handler in OPCN3.py, and once for the handler in seacanairy.py)
@@ -79,17 +92,8 @@ else:  # if this file is considered as a library (if you execute seacanairy.py f
     else:
         message_level = logging.INFO
     log_file = '/home/pi/seacanairy_project/log/' + project_name + '.log'  # complete location needed on the RPI
-
+    logger = set_logger(message_level, log_file)
     # no need to add a handler, because there is already one in seacanairy.py
-
-# set up logging to file
-logging.basicConfig(level=message_level,
-                    format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
-                    datefmt='%d-%m %H:%M:%S',
-                    filename=log_file,
-                    filemode='a')
-
-logger = logging.getLogger('CO2 sensor')  # name of the logger
 
 
 # all further logging must be called by logger.'level' and not logging.'level'
