@@ -7,6 +7,7 @@ at required intervals
 # import libraries
 import CO2  # Library for the CO2 sensor
 import OPCN3  # Library for the OPC-N3 sensor
+import GPS  # Library for the GPS
 import time
 from datetime import date, datetime, timedelta
 import csv  # for storing data in file
@@ -36,8 +37,6 @@ project_name = settings['Seacanairy settings']['Sampling session name']
 OPC_flushing_time = settings['OPC-N3 sensor']['Flushing time']
 
 OPC_sampling_time = settings['OPC-N3 sensor']['Sampling time']
-
-OPC_keep_all_data = settings['OPC-N3 sensor']['Keep a record of all the technical data']
 
 OPC_fan_speed = settings['OPC-N3 sensor']['Fan speed']
 
@@ -148,7 +147,9 @@ else:  # if file doesn't exist
                        "bin 18", "bin 19", "bin 20", "bin 21", "bin 22", "bin 23",
                        "bin 1 MToF", "bin 3 MToF", "bin 5 MToF", "bin 7 MToF",
                        "reject count glitch", "reject count long TOF", "reject count ratio",
-                       "reject count out of range", "fan revolution count", "laser status")
+                       "reject count out of range", "fan revolution count", "laser status",
+                       "GPS fix time", "latitude", "longitude", "SOG", "COG", "horizontal precision",
+                       "altitude", "WGS84 correction", "fix status")
 
 # Read the internal timestamp of the CO2 sensor, and change the value if necessary
 if CO2_sampling_period != CO2.internal_timestamp():  # if internal timestamp is not the good one... change it
@@ -159,14 +160,7 @@ if CO2_sampling_period != CO2.internal_timestamp():  # if internal timestamp is 
 OPCN3.set_fan_speed(OPC_fan_speed)  # (check the sampling flow rate displayed by the sensor for seacanairy pump choice)
 
 # Ask the CO2 sensor to take a new sample
-CO2.trigger_measurement(False)
-# The sensor will not take a new sample as long as the previous one is not older than 10 seconds
-time.sleep(11)  # wait a bit more than 10 seconds
-CO2.trigger_measurement(False)  # trigger new measurement
-# That way, we ensure that the sensor will trigger a new measurement RIGHT now
-
-# Wait the amount of time needed for the CO2 sensor to take the measurement (default 10 seconds in doc)
-time.sleep(settings['CO2 sensor']['Amount of time required for the sensor to take the measurement'])
+CO2.trigger_measurement()
 
 # LOOP
 
@@ -188,34 +182,33 @@ while True:
     print("*********** OPC-N3 ***********")
     OPC_data = OPCN3.getdata(OPC_flushing_time, OPC_sampling_time)
 
+    # Get GPS informations
+    print("************ GPS ************")
+    GPS_data = GPS.get_position()
+
     # Save the data in the .csv file
     print("Saving data in", path_csv)
     # If user want to store all the technical data (for the OPCN3, bin, MToF...)
-    if OPC_keep_all_data:
-        append_data_to_csv(now, CO2_data["relative humidity"], CO2_data["temperature"], CO2_data["pressure"],
-                           CO2_data["average"], CO2_data["instant"],
-                           OPC_data["PM 1"], OPC_data["PM 2.5"], OPC_data["PM 10"],
-                           OPC_data["temperature"], OPC_data["relative humidity"],
-                           OPC_data["sampling time"], OPC_data["sample flow rate"],
-                           OPC_data["bin 0"], OPC_data["bin 1"], OPC_data["bin 2"], OPC_data["bin 3"],
-                           OPC_data["bin 4"], OPC_data["bin 5"], OPC_data["bin 6"], OPC_data["bin 7"],
-                           OPC_data["bin 8"], OPC_data["bin 9"], OPC_data["bin 10"], OPC_data["bin 11"],
-                           OPC_data["bin 12"], OPC_data["bin 13"], OPC_data["bin 14"], OPC_data["bin 15"],
-                           OPC_data["bin 16"], OPC_data["bin 17"], OPC_data["bin 18"], OPC_data["bin 19"],
-                           OPC_data["bin 20"], OPC_data["bin 21"], OPC_data["bin 22"], OPC_data["bin 23"],
-                           OPC_data["bin 1 MToF"], OPC_data["bin 3 MToF"],
-                           OPC_data["bin 5 MToF"], OPC_data["bin 7 MToF"],
-                           OPC_data["reject count glitch"],
-                           OPC_data["reject count long TOF"], OPC_data["reject count ratio"],
-                           OPC_data["reject count out of range"],
-                           OPC_data["fan revolution count"], OPC_data["laser status"])
-    # If user do not want to store all those technical data
-    else:
-        append_data_to_csv(now, CO2_data["relative humidity"], CO2_data["temperature"], CO2_data["pressure"],
-                           CO2_data["average"], CO2_data["instant"],
-                           OPC_data["PM 1"], OPC_data["PM 2.5"], OPC_data["PM 10"],
-                           OPC_data["temperature"], OPC_data["relative humidity"],
-                           OPC_data["sampling time"], OPC_data["sample flow rate"])
+    append_data_to_csv(now, CO2_data["relative humidity"], CO2_data["temperature"], CO2_data["pressure"],
+                       CO2_data["average"], CO2_data["instant"],
+                       OPC_data["PM 1"], OPC_data["PM 2.5"], OPC_data["PM 10"],
+                       OPC_data["temperature"], OPC_data["relative humidity"],
+                       OPC_data["sampling time"], OPC_data["sample flow rate"],
+                       OPC_data["bin 0"], OPC_data["bin 1"], OPC_data["bin 2"], OPC_data["bin 3"],
+                       OPC_data["bin 4"], OPC_data["bin 5"], OPC_data["bin 6"], OPC_data["bin 7"],
+                       OPC_data["bin 8"], OPC_data["bin 9"], OPC_data["bin 10"], OPC_data["bin 11"],
+                       OPC_data["bin 12"], OPC_data["bin 13"], OPC_data["bin 14"], OPC_data["bin 15"],
+                       OPC_data["bin 16"], OPC_data["bin 17"], OPC_data["bin 18"], OPC_data["bin 19"],
+                       OPC_data["bin 20"], OPC_data["bin 21"], OPC_data["bin 22"], OPC_data["bin 23"],
+                       OPC_data["bin 1 MToF"], OPC_data["bin 3 MToF"],
+                       OPC_data["bin 5 MToF"], OPC_data["bin 7 MToF"],
+                       OPC_data["reject count glitch"],
+                       OPC_data["reject count long TOF"], OPC_data["reject count ratio"],
+                       OPC_data["reject count out of range"],
+                       OPC_data["fan revolution count"], OPC_data["laser status"],
+                       GPS_data["fix time"], GPS_data["latitude"], GPS_data["longitude"],
+                       GPS_data["SOG"], GPS_data["COG"], GPS_data["horizontal precision"],
+                       GPS_data["altitude"], GPS_data["WGS84 correction"], GPS_data["fix status"])
 
     # Time at which the sampling finishes
     finish = time.time()  # as previously, expressed in seconds since reference date

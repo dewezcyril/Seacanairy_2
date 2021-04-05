@@ -22,6 +22,9 @@ import logging
 # yaml settings
 import yaml
 
+# progress bar during sampling
+from progress.bar import IncrementalBar
+
 # 'SMBus' is the general driver for i2c communication
 # 'i2c_msg' allow to make i2c write followed by i2c read WITHOUT any STOP byte (see sensor documentation)
 
@@ -100,6 +103,21 @@ else:  # if this file is considered as a library (if you execute seacanairy.py f
 # if not, the logging will be displayed as ROOT and NOT 'CO2 sensor'
 
 # --------------------------------------------------------
+
+
+def loading_bar(name, delay):
+    """
+    Show a loading bar on the screen during sampling for example
+    :param name: Text to be shown on the left of the loading bar
+    :param length: Number of increments necessary for the bar to be full
+    :return: nothing
+    """
+    bar = IncrementalBar(name, max=(2 * delay), suffix='%(elapsed)s/' + str(delay) + ' seconds')
+    for i in range(2 * delay):
+        time.sleep(0.5)
+        bar.next()
+    bar.finish()
+    return
 
 
 def digest(buf):
@@ -404,7 +422,7 @@ def status(print_information=True):
     return [CO2_status, temperature_status, humidity_status]
 
 
-def trigger_measurement(let_time_to_sensor_to_measure=True):
+def trigger_measurement():
     """
     Ask the CO2 sensor to start a new measurement now if the previous one is older than 10 seconds
     Same function as 'status()'
@@ -412,10 +430,18 @@ def trigger_measurement(let_time_to_sensor_to_measure=True):
     :return: Status of the sensor: List[CO2 status, temperature status, humidity status]
     """
     logger.info("Triggering a new measurement...")
-    sensor_status = status(False)
-    if let_time_to_sensor_to_measure:  # if user/software want to wait for the data to be ready
-        logger.info("Waiting " + str(measurement_delay) + " seconds for sensor to take measurement")
-        time.sleep(measurement_delay)  # sensor documentation, let time to the sensor to perform the measurement
+
+    # The sensor will not take a new sample as long as the previous one is not older than 10 seconds
+    sensor_status = status(False)  # trigger new measurement
+
+    if measurement_delay != 0:  # if user/software want to wait for the data to be ready
+        loading_bar("Waiting for sensor sampling", measurement_delay)
+        # sensor documentation, let time to the sensor to perform the measurement
+
+        sensor_status = status(False)  # That way, we ensure that the sensor will trigger a new measurement RIGHT now
+
+        loading_bar("Waiting for sensor sampling", measurement_delay)
+        # sensor documentation, let time to the sensor to perform the measurement
     return sensor_status  # same function as 'status()', but here we don't want to print the status on the screen
 
 

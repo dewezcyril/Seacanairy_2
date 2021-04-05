@@ -126,15 +126,20 @@ def clean_data(data):
         "fix status": "unknown"
     }  # you must return all those items to avoid bugs in seacanairy.py (f-e looking for an item which doesn't exist)
     for i in range(len(data)):  # don't know at which line data will be send, so it will search for the good line
+        print(data[i], end='                              \r')
+        time.sleep(.25)
+        print("                                                                                          ", end='\r')
         if data[i][0:6] == "$GPRMC":
             if check(data[i]):
                 GPRMC = data[i].split(",")
                 if GPRMC[2] == "V":  # indicate that GPS is not working good
                     logger.warning("GPS does not receive signal")
-                    return False
-                elif GPRMC[2] == "A":  # indicate that GPS is working fine
-                    fix_time = GPRMC[1][0:2] + ":" + GPRMC[1][2:4] + ":" + GPRMC[1][4:6] + " GMT"
-                    status = GPRMC[2]
+                    status = "NOK"
+                    to_return.update({"status": status})
+                    return to_return
+                if GPRMC[2] == "A":  # indicate that GPS is working fine
+                    fix_time = GPRMC[1][0:2] + ":" + GPRMC[1][2:4] + ":" + GPRMC[1][4:6] + " UTC"
+                    status = "OK"
                     latitude = lat_long_decode(GPRMC[3], GPRMC[4])
                     longitude = lat_long_decode(GPRMC[5], GPRMC[6])
                     SOG = GPRMC[7]
@@ -238,8 +243,15 @@ def get_position():
     """
     logger.debug("Get position")
     reading = get_raw_reading()
-    data = clean_data(reading)  # if GPS does not receive signal,
-    logger.debug(data)
+    data = clean_data(reading)
+    print("Current time:\t", data["UTC"])
+    print("Latitude:\t", data["latitude"], "\t|\tLongitude:\t", data["longitude"])
+    print("SOG:\t\t", data["SOG"], "\t |\tCOG:\t", end='')
+    if data["COG"] == '':
+        print("none")
+    else:
+        print(data["COG"])
+    print("Status:\t", data["status"])
     return data
 
 

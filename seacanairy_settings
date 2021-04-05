@@ -23,7 +23,6 @@ OPC-N3 sensor:
   # measurement in high gain and in low gain mode
   Sampling time: 5
   Fan speed: 100 # 0 = the slowest, 100 = the fastest
-  Keep a record of all the technical data: Yes # bin number, sampling period, MToF...
   Take a new measurement if checksum is wrong (avoid shorter sampling periods when errors): Yes
   Store debug messages (important increase of logs): No
 
