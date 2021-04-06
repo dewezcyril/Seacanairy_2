@@ -94,7 +94,7 @@ bus = 0  # name of the SPI bus on the Raspberry Pi 3B+
 device = 0  # name of the SS (Ship Selection) pin used for the OPC-N3
 spi = spidev.SpiDev()  # enable SPI (SPI must be enable in the RPi settings beforehand)
 spi.open(bus, device)
-spi.max_speed_hz = 400000  # 750 kHz
+spi.max_speed_hz = 700000  # 750 kHz
 spi.mode = 0b01  # bytes(0b01) = int(1) --> SPI mode 1
 # first bit (from right) = CPHA = 0 --> data are valid when clock is rising
 # second bit (from right) = CPOL = 0 --> clock is kept low when idle
@@ -210,7 +210,7 @@ def fan_off():
         if initiate_transmission(0x03):
             reading = spi.xfer([0x02])
             # cs_high()
-            spi.close()  # close the serial port to let it available for another device
+            # spi.close()  # close the serial port to let it available for another device
             if reading == [0x03]:  # official answer of the OPC-N3
                 print("Fan is OFF                ")
                 time.sleep(0.5)  # avoid too close communication (AND let some time to the OPC-N3 to stop the fan)
@@ -248,7 +248,7 @@ def fan_on():
         if initiate_transmission(0x03):
             reading = spi.xfer([0x03])
             # cs_high()
-            spi.close()
+            # spi.close()
             time.sleep(0.6)  # wait > 600 ms to let the fan start
             if reading == [0x03]:  # official answer of the OPC-N3
                 print("Fan is ON               ")
@@ -287,7 +287,7 @@ def laser_on():
         if initiate_transmission(0x03):
             reading = spi.xfer([0x07])
             # cs_high()
-            spi.close()
+            # spi.close()
             if reading == [0x03]:
                 print("Laser is ON           ")
                 time.sleep(1)  # avoid too close communication
@@ -323,7 +323,7 @@ def laser_off():
         if initiate_transmission(0x03):
             reading = spi.xfer([0x06])
             # cs_high()
-            spi.close()
+            # spi.close()
             if reading == [0x03]:
                 print("Laser is OFF                    ")
                 time.sleep(1)  # avoid too close communication
@@ -356,7 +356,7 @@ def read_DAC_power_status(item='all'):
     if initiate_transmission(0x13):
         response = spi.xfer([0x13, 0x13, 0x13, 0x13, 0x13, 0x13])
         # cs_high()
-        spi.close()
+        # spi.close()
         time.sleep(0.5)  # avoid too close communication
 
         if item == 'fan':
@@ -475,7 +475,7 @@ def PM_reading():
             PM_B = spi.xfer([0x32, 0x32, 0x32, 0x32])
             PM_C = spi.xfer([0x32, 0x32, 0x32, 0x32])
             checksum = spi.xfer([0x32, 0x32])
-            spi.close()
+            # spi.close()
 
             PM1 = round(struct.unpack('f', bytes(PM_A))[0], 3)
             PM25 = round(struct.unpack('f', bytes(PM_B))[0], 3)
@@ -577,8 +577,9 @@ def read_histogram(sampling_period):
 
     # Delete old histogram data and start a new one
     if initiate_transmission(0x30):
-        spi.xfer([0x30] * 86)
-        spi.close()
+        answer = spi.xfer([0x30] * 86)
+        print(answer)
+        # spi.close()
         logger.debug("Old histogram in the OPC-N3 deleted, starting a new one")
     else:
         logger.critical("Failed to initiate histogram, skipping this measurement")
@@ -614,7 +615,7 @@ def read_histogram(sampling_period):
             fan_rev_count = spi.xfer([0x30] * 2)
             laser_status = spi.xfer([0x30] * 2)
             checksum = spi.xfer([0x30] * 2)
-            spi.close()
+            # spi.close()
 
             # check that the data transmitted are correct by comparing the checksums
             if check(checksum, bin, MToF, sampling_time, sample_flow_rate, temperature, relative_humidity,
@@ -861,19 +862,20 @@ if __name__ == '__main__':
     # The code below runs if you execute this code from this file (you must execute OPC-N3 and not seacanairy)
     while True:
         logger.debug("Code is running from the OPC-N3 file itself, debug messages shown")
-        print("Fan on 0")
-        set_fan_speed(0)
-        time.sleep(2)
-        fan_on()
-        time.sleep(3)
-        fan_off()
-        print("Fan on 100")
-        set_fan_speed(100)
-        time.sleep(2)
-        fan_on()
-        time.sleep(3)
-        fan_off()
-        # answer = getdata(OPC_flushing_time, OPC_sampling_time)
-        # print(answer)
-        # print("waiting 10 seconds...")
-        time.sleep(2)
+        # fan_on()
+        # read_DAC_power_status('fan')
+        # time.sleep(1)
+        # laser_on()
+        # read_DAC_power_status('laser')
+        # time.sleep(1)
+        # laser_off()
+        # read_DAC_power_status('laser')
+        # time.sleep(1)
+        # fan_off()
+        # read_DAC_power_status('fan')
+        # print("sleep")
+        # time.sleep(3)
+
+        getdata(2,3)
+        print("sleep")
+        time.sleep(5)

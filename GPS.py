@@ -2,6 +2,7 @@ import serial  # install libraries
 import time
 import yaml
 import logging
+import RPi.GPIO as GPIO
 
 # --------------------------------------------------------
 # YAML SETTINGS
@@ -65,13 +66,30 @@ else:  # if this file is considered as a library (if you execute 'seacanairy.py'
 # if not, the logging will be displayed as 'ROOT' and NOT 'GPS'
 
 
+# --------------------------------------------------------
+# GPIO SETTINGS
+# --------------------------------------------------------
+#
+# GPIO.setmode(GPIO.BCM)
+# GPIO.setup(25, GPIO.OUT, initial=GPIO.LOW, pull_up_down=GPIO.PUD_DOWN)
+# GPIO.output(25, GPIO.LOW)
+
+
+# def pulse():
+    # GPIO.output(25, GPIO.HIGH)
+    # time.sleep(.2)
+    # GPIO.output(25, GPIO.LOW)
+
+
 def get_raw_reading():
     """
     Get raw GPS reading via UART
     :return:
     """
     try:
-        ser = serial.Serial("/dev/serial0", 9600)
+        #ser = serial.Serial("/dev/serial0", 9600)
+        ser = serial.Serial(port='/dev/ttyACM0', baudrate=9600)
+        # pulse()
         time.sleep(1)
         ser.flush()
         try:
@@ -243,6 +261,24 @@ def get_position():
     """
     logger.debug("Get position")
     reading = get_raw_reading()
+
+    if not reading:
+        logger.critical("Failed to retrieve GPS data")
+        to_return = {
+            "fix time": "unknown",
+            "latitude": "unknown",
+            "longitude": "unknown",
+            "SOG": "unknown",
+            "COG": "unknown",
+            "status": "unknown",
+            "horizontal precision": "unknown",
+            "altitude": "unknown",
+            "WGS84 correction": "unknown",
+            "UTC": "unknown",
+            "fix status": "unknown"
+        }
+        return to_return
+
     data = clean_data(reading)
     print("Current time:\t", data["UTC"])
     print("Latitude:\t", data["latitude"], "\t|\tLongitude:\t", data["longitude"])
