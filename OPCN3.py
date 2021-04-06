@@ -136,7 +136,7 @@ def initiate_transmission(command_byte):
     attempts = 1  # sensor is busy loop
     cycle = 1  # SPI buffer reset loop (going to the right on the flowchart)
 
-    logger.debug("Initiate transmission with command byte " + str(command_byte))
+    logger.debug("Initiate transmission with command byte " + str(hex(command_byte)))
 
     stop = time.time() + time_available_for_initiate_transmission
     # time in seconds at which we consider it took too much time to answer
@@ -210,7 +210,7 @@ def fan_off():
         if initiate_transmission(0x03):
             reading = spi.xfer([0x02])
             # cs_high()
-            # spi.close()  # close the serial port to let it available for another device
+            spi.close()  # close the serial port to let it available for another device
             if reading == [0x03]:  # official answer of the OPC-N3
                 print("Fan is OFF                ")
                 time.sleep(0.5)  # avoid too close communication (AND let some time to the OPC-N3 to stop the fan)
@@ -233,6 +233,7 @@ def fan_off():
         else:
             logger.critical("Failed to stop the fan (transmission problem)")
             return True
+    return True
 
 
 def fan_on():
@@ -248,7 +249,7 @@ def fan_on():
         if initiate_transmission(0x03):
             reading = spi.xfer([0x03])
             # cs_high()
-            # spi.close()
+            spi.close()
             time.sleep(0.6)  # wait > 600 ms to let the fan start
             if reading == [0x03]:  # official answer of the OPC-N3
                 print("Fan is ON               ")
@@ -273,6 +274,7 @@ def fan_on():
         else:
             logger.critical("Failed to start the fan (transmission problem)")
             return False
+    return True
 
 
 def laser_on():
@@ -287,7 +289,7 @@ def laser_on():
         if initiate_transmission(0x03):
             reading = spi.xfer([0x07])
             # cs_high()
-            # spi.close()
+            spi.close()
             if reading == [0x03]:
                 print("Laser is ON           ")
                 time.sleep(1)  # avoid too close communication
@@ -309,6 +311,7 @@ def laser_on():
         else:
             logger.critical("Failed to start the laser (transmission problem)")
             return False
+    return False
 
 
 def laser_off():
@@ -323,7 +326,7 @@ def laser_off():
         if initiate_transmission(0x03):
             reading = spi.xfer([0x06])
             # cs_high()
-            # spi.close()
+            spi.close()
             if reading == [0x03]:
                 print("Laser is OFF                    ")
                 time.sleep(1)  # avoid too close communication
@@ -344,6 +347,7 @@ def laser_off():
                 return True  # indicate that laser is still on
         else:
             logger.critical("Failed to stop the laser (transmission problem)")
+    return True
 
 
 def read_DAC_power_status(item='all'):
@@ -356,7 +360,7 @@ def read_DAC_power_status(item='all'):
     if initiate_transmission(0x13):
         response = spi.xfer([0x13, 0x13, 0x13, 0x13, 0x13, 0x13])
         # cs_high()
-        # spi.close()
+        spi.close()
         time.sleep(0.5)  # avoid too close communication
 
         if item == 'fan':
@@ -475,7 +479,7 @@ def PM_reading():
             PM_B = spi.xfer([0x32, 0x32, 0x32, 0x32])
             PM_C = spi.xfer([0x32, 0x32, 0x32, 0x32])
             checksum = spi.xfer([0x32, 0x32])
-            # spi.close()
+            spi.close()
 
             PM1 = round(struct.unpack('f', bytes(PM_A))[0], 3)
             PM25 = round(struct.unpack('f', bytes(PM_B))[0], 3)
@@ -579,7 +583,7 @@ def read_histogram(sampling_period):
     if initiate_transmission(0x30):
         answer = spi.xfer([0x30] * 86)
         print(answer)
-        # spi.close()
+        spi.close()
         logger.debug("Old histogram in the OPC-N3 deleted, starting a new one")
     else:
         logger.critical("Failed to initiate histogram, skipping this measurement")
@@ -615,7 +619,7 @@ def read_histogram(sampling_period):
             fan_rev_count = spi.xfer([0x30] * 2)
             laser_status = spi.xfer([0x30] * 2)
             checksum = spi.xfer([0x30] * 2)
-            # spi.close()
+            spi.close()
 
             # check that the data transmitted are correct by comparing the checksums
             if check(checksum, bin, MToF, sampling_time, sample_flow_rate, temperature, relative_humidity,
