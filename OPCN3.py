@@ -94,7 +94,7 @@ bus = 0  # name of the SPI bus on the Raspberry Pi 3B+
 device = 0  # name of the SS (Ship Selection) pin used for the OPC-N3
 spi = spidev.SpiDev()  # enable SPI (SPI must be enable in the RPi settings beforehand)
 spi.open(bus, device)
-spi.max_speed_hz = 700000  # 750 kHz
+spi.max_speed_hz = 300000  # 750 kHz
 spi.mode = 0b01  # bytes(0b01) = int(1) --> SPI mode 1
 # first bit (from right) = CPHA = 0 --> data are valid when clock is rising
 # second bit (from right) = CPOL = 0 --> clock is kept low when idle

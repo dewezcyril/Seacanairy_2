@@ -56,6 +56,7 @@ max_attempts = settings['CO2 sensor']['Number of reading attempts']
 # all the settings and other code for the logging
 # logging = tak a trace of some messages in a file to be reviewed afterward (check for errors fe)
 
+
 def set_logger(message_level, log_file):
     # set up logging to file
     logging.basicConfig(level=message_level,
@@ -68,6 +69,7 @@ def set_logger(message_level, log_file):
     # all further logging must be called by logger.'level' and not logging.'level'
     # if not, the logging will be displayed as 'ROOT' and NOT 'OPC-N3'
     return logger
+
 
 if __name__ == '__main__':  # if you run this code directly ($ python3 CO2.py)
     message_level = logging.DEBUG  # show ALL the logging messages
@@ -164,6 +166,10 @@ def check(checksum, data):
         logger.error("Checksum is wrong, sensor checksum is: " + str(checksum) +
                      ", seacanairy checksum is: " + str(calculation) +
                      ", data returned by the sensor is:" + str(data))
+        if data[0] and data[1] == 0:
+            logger.debug("Sensor returned 0 values, it is not ready, waiting a bit")
+            print("Sensor not ready, waiting...", end='\r')
+            time.sleep(4)
         return False
 
 
@@ -309,6 +315,7 @@ def getCO2P():
                 logger.error("Error in the i2c transmission, trying again... (" +
                              str(reading_trials + 1) + "/" + str(max_attempts) + ")")
                 reading_trials += 1  # increment of reading_trials
+                print("Waiting 4 seconds...", end='\r')
                 time.sleep(4)  # if I²C comm fails, wait a little bit and try again (sensor is maybe busy)
 
         # process the data given by the sensor

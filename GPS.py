@@ -87,8 +87,11 @@ def get_raw_reading():
     :return:
     """
     try:
-        #ser = serial.Serial("/dev/serial0", 9600)
-        ser = serial.Serial(port='/dev/ttyACM0', baudrate=9600)
+        # USB = '/dev/ttyACM0'
+        # UART = '/dev/serial0' == '/dev/ttyAMA0'
+        port = '/dev/ttyAMA0'
+        print("Port is", port)
+        ser = serial.Serial(port=port, baudrate=9600)
         # pulse()
         time.sleep(1)
         ser.flush()
@@ -96,13 +99,13 @@ def get_raw_reading():
             reading = ser.read_all()
             reading = str(reading, 'utf-8')  # convert the text sent in b'...' format into readable format...
             # it will also skip the line where the GPS propose it
-            logger.debug("Raw reading is:")
-            logger.debug(reading)
-            ser.close()  # close the UART port to avoid problem and unecessary buffer filling
+            logger.debug("Raw reading is:\r" + reading)
+            #ser.close()  # close the UART port to avoid problem and unecessary buffer filling
             return reading
         except:
             logger.critical("Failed to read GPS data on UART port")
             return False
+        ser.close()
     except:
         logger.critical("Failed to initiate UART port for GPS")
         return False
