@@ -183,8 +183,7 @@ while True:
     print("*********** OPC-N3 ***********")
     OPC_data = OPCN3.getdata(OPC_flushing_time, OPC_sampling_time)
 
-    print("Waiting 5 secs")
-    time.sleep(5)
+    time.sleep(1)
 
     # Get GPS informations
     print("************ GPS ************")

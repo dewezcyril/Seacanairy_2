@@ -3,6 +3,7 @@ import time
 import yaml
 import logging
 import RPi.GPIO as GPIO
+import sys
 
 # --------------------------------------------------------
 # YAML SETTINGS
@@ -97,19 +98,18 @@ def get_raw_reading():
         ser.flush()
         try:
             reading = ser.read_all()
-            reading = str(reading, 'utf-8')  # convert the text sent in b'...' format into readable format...
-            # it will also skip the line where the GPS propose it
-            logger.debug("Raw reading is:\r" + reading)
-            #ser.close()  # close the UART port to avoid problem and unecessary buffer filling
-            return reading
+            ser.close()
         except:
-            logger.critical("Failed to read GPS data on UART port")
+            logger.critical("Failed to read GPS data on UART port (" + str(sys.exc_info()) + ")")
             return False
-        ser.close()
     except:
-        logger.critical("Failed to initiate UART port for GPS")
+        logger.critical("Failed to initiate UART port for GPS (" + str(sys.exc_info()) + ")")
         return False
 
+    reading = str(reading, 'utf-8', errors='ignore')  # convert the text sent in b'...' format into readable format...
+    # it will also skip the line where the GPS propose it
+    logger.debug("Raw reading is:\r" + reading)
+    return reading
 
 def lat_long_decode(raw_position, compas):
     """

@@ -236,7 +236,7 @@ def getRHT():
                                     + str(max_attempts) + "consecutive times, skipping this RH and temperature reading")
                     return data  # indicate clearly that data are wrong
 
-                logger.error("Error in the i2c transmission (" + str(sys.exc_info()[0])
+                logger.error("Error in the i2c transmission (" + str(sys.exc_info())
                              + "), trying again... (" + str(reading_trials + 1) + "/" + str(max_attempts) + ")")
                 reading_trials += 1  # increment of reading_trials
                 time.sleep(4)  # if transmission fails, wait a bit to try again (sensor is maybe busy)

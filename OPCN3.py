@@ -94,7 +94,7 @@ bus = 0  # name of the SPI bus on the Raspberry Pi 3B+
 device = 0  # name of the SS (Ship Selection) pin used for the OPC-N3
 spi = spidev.SpiDev()  # enable SPI (SPI must be enable in the RPi settings beforehand)
 spi.open(bus, device)
-spi.max_speed_hz = 300000  # 750 kHz
+spi.max_speed_hz = 307200  # 750 kHz
 spi.mode = 0b01  # bytes(0b01) = int(1) --> SPI mode 1
 # first bit (from right) = CPHA = 0 --> data are valid when clock is rising
 # second bit (from right) = CPOL = 0 --> clock is kept low when idle
@@ -204,13 +204,14 @@ def fan_off():
     :return: FALSE
     """
     print("Turning fan OFF", end='\r')
+    logger.debug("Turning fan OFF")
     attempts = 1
 
     while attempts < 4:
         if initiate_transmission(0x03):
             reading = spi.xfer([0x02])
             # cs_high()
-            spi.close()  # close the serial port to let it available for another device
+            # spi.close()  # close the serial port to let it available for another device
             if reading == [0x03]:  # official answer of the OPC-N3
                 print("Fan is OFF                ")
                 time.sleep(0.5)  # avoid too close communication (AND let some time to the OPC-N3 to stop the fan)
@@ -227,6 +228,8 @@ def fan_off():
                     time.sleep(wait_reset_SPI_buffer)
                 else:
                     attempts += 1
+                    print("Waiting SPI Buffer reset", end='\r')
+                    time.sleep(wait_reset_SPI_buffer)
             if attempts >= 3:
                 logger.critical("Failed 3 consecutive times to stop the fan")
                 return True
@@ -241,7 +244,8 @@ def fan_on():
     Turn ON the fan of the OPC-N3 ON.
     :return: TRUE
     """
-    print("Turning fan on", end='\r')
+    print("Turning fan ON", end='\r')
+    logger.debug("Turning fan ON")
 
     attempts = 1
 
@@ -249,7 +253,7 @@ def fan_on():
         if initiate_transmission(0x03):
             reading = spi.xfer([0x03])
             # cs_high()
-            spi.close()
+            # spi.close()
             time.sleep(0.6)  # wait > 600 ms to let the fan start
             if reading == [0x03]:  # official answer of the OPC-N3
                 print("Fan is ON               ")
@@ -267,6 +271,8 @@ def fan_on():
                     time.sleep(wait_reset_SPI_buffer)
                 else:
                     attempts += 1
+                    print("Waiting SPI Buffer reset", end='\r')
+                    time.sleep(wait_reset_SPI_buffer)
             if attempts >= 3:
                 log = "Failed 3 times to start the fan"
                 logger.critical(log)
@@ -283,13 +289,14 @@ def laser_on():
     :return: TRUE
     """
     print("Turning laser ON", end='\r')
+    logger.debug("Turning laser ON")
     attempts = 0
 
     while attempts < 4:
         if initiate_transmission(0x03):
             reading = spi.xfer([0x07])
             # cs_high()
-            spi.close()
+            # spi.close()
             if reading == [0x03]:
                 print("Laser is ON           ")
                 time.sleep(1)  # avoid too close communication
@@ -302,6 +309,10 @@ def laser_on():
                     return True  # indicate that the laser is ON
                 elif reading == 0:
                     logger.error("Failed to start the laser, trying again...")
+                    attempts += 1
+                    print("Waiting SPI Buffer reset", end='\r')
+                    time.sleep(wait_reset_SPI_buffer)
+                else:
                     attempts += 1
                     print("Waiting SPI Buffer reset", end='\r')
                     time.sleep(wait_reset_SPI_buffer)
@@ -320,13 +331,15 @@ def laser_off():
     :return: FALSE
     """
     print("Turning the laser OFF", end='\r')
+    logger.debug("Turning laser OFF")
     attempts = 0
 
     while attempts < 4:
+        print("attempts = ", attempts, "                ")
         if initiate_transmission(0x03):
             reading = spi.xfer([0x06])
             # cs_high()
-            spi.close()
+            # spi.close()
             if reading == [0x03]:
                 print("Laser is OFF                    ")
                 time.sleep(1)  # avoid too close communication
@@ -342,11 +355,16 @@ def laser_off():
                     attempts += 1
                     print("Waiting SPI Buffer reset", end='\r')
                     time.sleep(wait_reset_SPI_buffer)
+                else:
+                    attempts += 1
+                    print("Waiting SPI Buffer reset", end='\r')
+                    time.sleep(wait_reset_SPI_buffer)
             if attempts >= 3:
                 logger.critical("Failed 4 times to stop the laser")
                 return True  # indicate that laser is still on
         else:
             logger.critical("Failed to stop the laser (transmission problem)")
+            return True
     return True
 
 
@@ -360,7 +378,7 @@ def read_DAC_power_status(item='all'):
     if initiate_transmission(0x13):
         response = spi.xfer([0x13, 0x13, 0x13, 0x13, 0x13, 0x13])
         # cs_high()
-        spi.close()
+        # spi.close()
         time.sleep(0.5)  # avoid too close communication
 
         if item == 'fan':
@@ -479,7 +497,7 @@ def PM_reading():
             PM_B = spi.xfer([0x32, 0x32, 0x32, 0x32])
             PM_C = spi.xfer([0x32, 0x32, 0x32, 0x32])
             checksum = spi.xfer([0x32, 0x32])
-            spi.close()
+            # spi.close()
 
             PM1 = round(struct.unpack('f', bytes(PM_A))[0], 3)
             PM25 = round(struct.unpack('f', bytes(PM_B))[0], 3)
@@ -581,9 +599,9 @@ def read_histogram(sampling_period):
 
     # Delete old histogram data and start a new one
     if initiate_transmission(0x30):
-        answer = spi.xfer([0x30] * 86)
+        answer = spi.xfer([0x00] * 86)
         print(answer)
-        spi.close()
+        # spi.close()
         logger.debug("Old histogram in the OPC-N3 deleted, starting a new one")
     else:
         logger.critical("Failed to initiate histogram, skipping this measurement")
@@ -603,29 +621,33 @@ def read_histogram(sampling_period):
 
         if initiate_transmission(0x30):
             # read all the bytes and store them in a dedicated variable
-            bin = spi.xfer([0x30] * 48)
-            MToF = spi.xfer([0x30] * 4)
-            sampling_time = spi.xfer([0x30] * 2)
-            sample_flow_rate = spi.xfer([0x30] * 2)
-            temperature = spi.xfer([0x30] * 2)
-            relative_humidity = spi.xfer([0x30] * 2)
-            PM_A = spi.xfer([0x30] * 4)
-            PM_B = spi.xfer([0x30] * 4)
-            PM_C = spi.xfer([0x30] * 4)
-            reject_count_glitch = spi.xfer([0x30] * 2)
-            reject_count_longTOF = spi.xfer([0x30] * 2)
-            reject_count_ratio = spi.xfer([0x30] * 2)
-            reject_count_Out_Of_Range = spi.xfer([0x30] * 2)
-            fan_rev_count = spi.xfer([0x30] * 2)
-            laser_status = spi.xfer([0x30] * 2)
-            checksum = spi.xfer([0x30] * 2)
-            spi.close()
+            bin = spi.xfer([0x00] * 48)
+            MToF = spi.xfer([0x00] * 4)
+            sampling_time = spi.xfer([0x00] * 2)
+            sample_flow_rate = spi.xfer([0x00] * 2)
+            temperature = spi.xfer([0x00] * 2)
+            relative_humidity = spi.xfer([0x00] * 2)
+            PM_A = spi.xfer([0x00] * 4)
+            PM_B = spi.xfer([0x00] * 4)
+            PM_C = spi.xfer([0x00] * 4)
+            reject_count_glitch = spi.xfer([0x00] * 2)
+            reject_count_longTOF = spi.xfer([0x00] * 2)
+            reject_count_ratio = spi.xfer([0x00] * 2)
+            reject_count_Out_Of_Range = spi.xfer([0x00] * 2)
+            fan_rev_count = spi.xfer([0x00] * 2)
+            laser_status = spi.xfer([0x00] * 2)
+            checksum = spi.xfer([0x00] * 2)
+            # spi.close()
 
             # check that the data transmitted are correct by comparing the checksums
             if check(checksum, bin, MToF, sampling_time, sample_flow_rate, temperature, relative_humidity,
                      PM_A, PM_B,
                      PM_C, reject_count_glitch, reject_count_longTOF, reject_count_ratio, reject_count_Out_Of_Range,
                      fan_rev_count, laser_status):
+                print(bin, MToF, sampling_time, sample_flow_rate, temperature, relative_humidity,
+                     PM_A, PM_B,
+                     PM_C, reject_count_glitch, reject_count_longTOF, reject_count_ratio, reject_count_Out_Of_Range,
+                     fan_rev_count, laser_status)
                 # return TRUE if the data are correct, and execute the below
                 # rounding until 2 decimals, as this is the accuracy of the OPC-N3 for PM values
                 PM1 = round(struct.unpack('f', bytes(PM_A))[0], 2)
@@ -821,6 +843,7 @@ def getdata(flushing_time, sampling_time):
         else:
             logger.critical("Skipping histogram reading")
         fan_off()
+        spi.close()
         return to_return
 
     except(KeyboardInterrupt, SystemExit):  # in case of error AND if user stop the software
