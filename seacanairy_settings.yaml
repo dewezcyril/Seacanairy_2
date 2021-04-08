@@ -3,29 +3,32 @@
 
 Seacanairy settings:
   # Name of the folder in which the log and data files will be stored:
-  Sampling session name: "seacanairy" #.csv
+  Sampling session name: "THE_FINAL" #.csv
   # Amount of time between each consecutive measurement
   Sampling period: 60  # seconds
 
 
 CO2 sensor:
+  Activate this sensor: Yes
   Automatic sampling frequency (number of sample during the above sampling period): 1
-  Amount of time required for the sensor to take the measurement: 8  # seconds (Default value: 10 seconds)
-  Store debug messages (important increase of logs): No
+  Amount of time required for the sensor to take the measurement: 10  # seconds (Default value: 10 seconds)
+  Store debug messages (important increase of logs): Yes
   Number of reading attempts: 3
 
 
 OPC-N3 sensor:
+  Activate this sensor: Yes
   # Amount of time at which the fan keep running to refresh the air inside the sensor casing
-  Flushing time: 2
+  Flushing time: 4
     # Amount of time at which the laser is kept on and measure the air
     # This period will be multiplied by 2 because the sensor automatically take a
   # measurement in high gain and in low gain mode
-  Sampling time: 5
+  Sampling time: 4
   Fan speed: 100 # 0 = the slowest, 100 = the fastest
   Take a new measurement if checksum is wrong (avoid shorter sampling periods when errors): Yes
-  Store debug messages (important increase of logs): No
+  Store debug messages (important increase of logs): Yes
 
 
 GPS:
-  Store debug messages (important increase of logs): No
+  Activate this sensor: Yes
+  Store debug messages (important increase of logs): Yes

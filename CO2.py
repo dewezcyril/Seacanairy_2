@@ -13,6 +13,9 @@ from datetime import date, datetime
 # Get the errors
 import sys
 
+# Create folders and files
+import os
+
 # smbus2 is the new smbus, allow more than 32 bits writing/reading
 from smbus2 import SMBus, i2c_msg
 
@@ -37,8 +40,10 @@ bus = SMBus(1)  # make it easier to read/write to the sensor (bus.read or bus.wr
 # --------------------------------------------------------
 # YAML SETTINGS
 # --------------------------------------------------------
+# Get current directory
+current_working_directory = str(os.getcwd())
 
-with open('/home/pi/seacanairy_project/seacanairy_settings.yaml') as file:
+with open(current_working_directory + '/seacanairy_settings.yaml') as file:
     settings = yaml.safe_load(file)
     file.close()
 
@@ -73,7 +78,10 @@ def set_logger(message_level, log_file):
 
 if __name__ == '__main__':  # if you run this code directly ($ python3 CO2.py)
     message_level = logging.DEBUG  # show ALL the logging messages
-    log_file = '/home/pi/seacanairy_project/log/CO2-debug.log'  # complete file location required for the Raspberry
+    # Create a file to store the log if it doesn't exist
+    log_file = current_working_directory + "/log/CO2-debugging.log"
+    if not os.path.isfile(log_file):
+        os.mknod(log_file)
     print("CO2 Sensor DEBUG messages will be shown and stored in '" + str(log_file) + "'")
     logger = set_logger(message_level, log_file)
     # The following HANDLER must be activated ONLY if you run this code alone
@@ -96,7 +104,8 @@ else:  # if this file is considered as a library (if you execute seacanairy.py f
         message_level = logging.DEBUG
     else:
         message_level = logging.INFO
-    log_file = '/home/pi/seacanairy_project/log/' + project_name + '.log'  # complete location needed on the RPI
+    # Create a file to store the log if it doesn't exist
+    log_file = current_working_directory + "/" + project_name + "/" + project_name + "-log.log"
     logger = set_logger(message_level, log_file)
     # no need to add a handler, because there is already one in seacanairy.py
 

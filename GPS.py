@@ -4,12 +4,16 @@ import yaml
 import logging
 import RPi.GPIO as GPIO
 import sys
+import os.path
 
 # --------------------------------------------------------
 # YAML SETTINGS
 # --------------------------------------------------------
 
-with open('/home/pi/seacanairy_project/seacanairy_settings.yaml') as file:
+# Get current directory
+current_working_directory = str(os.getcwd())
+
+with open(current_working_directory + '/seacanairy_settings.yaml') as file:
     settings = yaml.safe_load(file)
     file.close()
 
@@ -39,7 +43,10 @@ def set_logger(message_level, log_file):
 
 if __name__ == '__main__':  # if you run this code directly ($ python3 CO2.py)
     message_level = logging.DEBUG  # show ALL the logging messages
-    log_file = '/home/pi/seacanairy_project/log/GPS-debug.log'  # complete file location required for the Raspberry
+    # Create a file to store the log if it doesn't exist
+    log_file = current_working_directory + "/log/GPS-debugging.log"
+    if not os.path.isfile(log_file):
+        os.mknod(log_file)
     print("GPS DEBUG messages will be shown and stored in '" + str(log_file) + "'")
     logger = set_logger(message_level, log_file)
     # define a Handler which writes INFO messages or higher to the sys.stderr/display
@@ -58,7 +65,7 @@ else:  # if this file is considered as a library (if you execute 'seacanairy.py'
         message_level = logging.DEBUG
     else:
         message_level = logging.INFO
-    log_file = '/home/pi/seacanairy_project/log/' + project_name + '.log'  # complete location needed on the RPI
+    log_file = '/home/pi/seacanairy_project/log/' + project_name + '-log.log'  # complete location needed on the RPI
     # no need to add a handler, because there is already one in seacanairy.py
     logger = set_logger(message_level, log_file)
 
@@ -77,9 +84,9 @@ else:  # if this file is considered as a library (if you execute 'seacanairy.py'
 
 
 # def pulse():
-    # GPIO.output(25, GPIO.HIGH)
-    # time.sleep(.2)
-    # GPIO.output(25, GPIO.LOW)
+# GPIO.output(25, GPIO.HIGH)
+# time.sleep(.2)
+# GPIO.output(25, GPIO.LOW)
 
 
 def get_raw_reading():
@@ -87,33 +94,38 @@ def get_raw_reading():
     Get raw GPS reading via UART
     :return:
     """
+    port = '/dev/ttyAMA0'
     try:
         # USB = '/dev/ttyACM0'
-        # UART = '/dev/serial0' == '/dev/ttyAMA0'
-        port = '/dev/ttyAMA0'
-        print("Port is", port)
+        # PL011 = '/dev/serial0' == '/dev/ttyAMA0'
+        logger.debug("Port used for UART communication is: " + str(port))
         ser = serial.Serial(port=port, baudrate=9600)
-        # pulse()
+        print("Starting UART communication...", end='\r')
         time.sleep(1)
         ser.flush()
         try:
+            ser.read_all()  # delete all corrupted data
+            ser.flush()  # flush the buffer
+            time.sleep(1)
             reading = ser.read_all()
             ser.close()
         except:
-            logger.critical("Failed to read GPS data on UART port (" + str(sys.exc_info()) + ")")
-            return False
+            logger.critical("Failed to read GPS data on UART port " + str(port) + " (" + str(sys.exc_info()) + ")")
+            return False  # indicate error
     except:
-        logger.critical("Failed to initiate UART port for GPS (" + str(sys.exc_info()) + ")")
-        return False
+        logger.critical("Failed to initiate UART port " + str(port) + " (" + str(sys.exc_info()) + ")")
+        return False  # indicate error
 
-    reading = str(reading, 'utf-8', errors='ignore')  # convert the text sent in b'...' format into readable format...
-    # it will also skip the line where the GPS propose it
-    logger.debug("Raw reading is:\r" + reading)
+    reading = str(reading, 'utf-8', errors='replace')  # convert the text sent in b'...' format into readable format...
+    # it will also skip the line where the GPS propose it (see NMEA protocol)
+    # 'replace' = replace the unencodable unicode to a question mark
+    logger.debug("Raw reading is:\r" + str(reading[:-1]))
     return reading
+
 
 def lat_long_decode(raw_position, compas):
     """
-    Decode longitude and latitude data
+    Decode longitude and latitude data from NMEA
     :param raw_position: raw longitude/latitude word
     :param compas: compas (N/S/W/E)
     :return: decoded latitude/longitude
@@ -122,15 +134,16 @@ def lat_long_decode(raw_position, compas):
     min = position[0][-2:]
     min_dec = position[1]
     deg = position[0][0:-2]
-    position = deg + "°" + min + "." + min_dec + "' " + compas
+    position = deg + '°' + min + "." + min_dec + "' " + compas
     return position
 
 
-def clean_data(data):
+def decode_NMEA(data):
     """
-    Clean the data returned by the GPS and extract useful data
-    :param data: whole string returned by the GPS
-    :return: dictionary
+    Decode the NMEA script and get useful data
+    :param data: whole string returned by the GPS (all the lines of the NMEA)
+    :return: dictionary (fix time, latitude, longitude, SOG, COG, status, horizontal precision, altitude,
+    WGS84 correction, UTC, fix status)
     """
     data = data.split("\r\n")  # create a list of lines (\r\n is sent by the sensor at the end of each line)
     to_return = {
@@ -147,8 +160,8 @@ def clean_data(data):
         "fix status": "unknown"
     }  # you must return all those items to avoid bugs in seacanairy.py (f-e looking for an item which doesn't exist)
     for i in range(len(data)):  # don't know at which line data will be send, so it will search for the good line
-        print(data[i], end='                              \r')
-        time.sleep(.25)
+        print(data[i], end='              \r')
+        time.sleep(.2)  # let a bit of time for the user to see the data returned by the GPS
         print("                                                                                          ", end='\r')
         if data[i][0:6] == "$GPRMC":
             if check(data[i]):
@@ -175,9 +188,6 @@ def clean_data(data):
                         "status": status
                     })
 
-                    logger.debug("GPRMC data is:")
-                    logger.debug(str(to_return))
-
                 else:
                     logger.critical("Something wrong with the GPRMC data, GPS satus returned is: " + str(GPRMC[2]))
 
@@ -197,16 +207,17 @@ def clean_data(data):
                 altitude = GPGGA[9] + " " + GPGGA[10]
                 WGS84_correction = GPGGA[11] + " " + GPGGA[12]
                 position_fix_status_indicator = GPGGA[6]
-                if position_fix_status_indicator == 0:
+                if position_fix_status_indicator == '0':
                     fix_status = "No fix/invalid"
-                elif position_fix_status_indicator == 1:
+                elif position_fix_status_indicator == '1':
                     fix_status = "Standard GPS 2D/3D"
-                elif position_fix_status_indicator == 2:
+                elif position_fix_status_indicator == '2':
                     fix_status = "DGPS"
-                elif position_fix_status_indicator == 6:
+                elif position_fix_status_indicator == '6':
                     fix_status = "DR"
                 else:
-                    logger.error("Unknown position fix status indicator in GPGGA: " + str(position_fix_status_indicator))
+                    logger.error(
+                        "Unknown position fix status indicator in GPGGA: " + str(position_fix_status_indicator))
                     fix_status = "Unknown: " + str(position_fix_status_indicator)
 
                 to_return.update({
@@ -282,10 +293,10 @@ def get_position():
         }
         return to_return
 
-    data = clean_data(reading)
+    data = decode_NMEA(reading)
     print("Current time:\t", data["UTC"])
     print("Latitude:\t", data["latitude"], "\t|\tLongitude:\t", data["longitude"])
-    print("SOG:\t\t", data["SOG"], "\t |\tCOG:\t", end='')
+    print("SOG:\t\t", data["SOG"], "\t\t|\tCOG:\t", end='')
     if data["COG"] == '':
         print("none")
     else:

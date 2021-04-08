@@ -8,7 +8,7 @@ import time
 import struct  # to convert the IEEE bytes to float
 import datetime
 import sys
-import os.path
+import os
 from progress.bar import IncrementalBar  # progress bar during sampling
 # import RPi.GPIO as GPIO
 
@@ -21,7 +21,10 @@ import yaml
 # YAML SETTINGS
 # --------------------------------------------------------
 
-with open('/home/pi/seacanairy_project/seacanairy_settings.yaml') as file:
+# Get current directory
+current_working_directory = str(os.getcwd())
+
+with open(current_working_directory + '/seacanairy_settings.yaml') as file:
     settings = yaml.safe_load(file)
     file.close()
 
@@ -60,7 +63,10 @@ def set_logger(message_level, log_file):
 
 if __name__ == '__main__':  # if you run this code directly ($ python3 CO2.py)
     message_level = logging.DEBUG  # show ALL the logging messages
-    log_file = '/home/pi/seacanairy_project/log/OPCN3-debug.log'  # complete file location required for the Raspberry
+    # Create a file to store the log if it doesn't exist
+    log_file = current_working_directory + "/log/OPCN3-debugging.log"  # complete file location required for the Raspberry
+    if not os.path.isfile(log_file):
+        os.mknod(log_file)
     print("DEBUG messages will be shown and stored in '" + str(log_file) + "'")
     logger = set_logger(message_level, log_file)
     # define a Handler which writes INFO messages or higher to the sys.stderr/display
@@ -79,7 +85,7 @@ else:  # if this file is considered as a library (if you execute 'seacanairy.py'
         message_level = logging.DEBUG
     else:
         message_level = logging.INFO
-    log_file = '/home/pi/seacanairy_project/log/' + project_name + '.log'  # complete location needed on the RPI
+    log_file = current_working_directory + "/" + project_name + "/" + project_name + "-log.log"
     # no need to add a handler, because there is already one in seacanairy.py
     logger = set_logger(message_level, log_file)
 
@@ -145,6 +151,7 @@ def initiate_transmission(command_byte):
     # cs_low()  # not used anymore
 
     while time.time() < stop:
+        # logger.debug("attempts = " + str(attempts))  # disable to reduce the amount of time between spi.xfer
         reading = spi.xfer([command_byte])  # initiate control of power state
         # spi.xfer() = write a byte AND READ AT THE SAME TIME
 
@@ -208,6 +215,7 @@ def fan_off():
     attempts = 1
 
     while attempts < 4:
+        # logger.debug("attempts = " + str(attempts))  # disable to reduce the amount of time between spi.xfer
         if initiate_transmission(0x03):
             reading = spi.xfer([0x02])
             # cs_high()
@@ -250,7 +258,9 @@ def fan_on():
     attempts = 1
 
     while attempts < 4:
+        # logger.debug("attempts = " + str(attempts))  # disable to reduce the amount of time between spi.xfer
         if initiate_transmission(0x03):
+            logger.debug("attempts = " + str(attempts))
             reading = spi.xfer([0x03])
             # cs_high()
             # spi.close()
@@ -293,6 +303,7 @@ def laser_on():
     attempts = 0
 
     while attempts < 4:
+        # logger.debug("attempts = " + str(attempts))  # disable to reduce the amount of time between spi.xfer
         if initiate_transmission(0x03):
             reading = spi.xfer([0x07])
             # cs_high()
@@ -335,7 +346,7 @@ def laser_off():
     attempts = 0
 
     while attempts < 4:
-        print("attempts = ", attempts, "                ")
+        # logger.debug("attempts = " + str(attempts))  # disable to reduce the amount of time between spi.xfer
         if initiate_transmission(0x03):
             reading = spi.xfer([0x06])
             # cs_high()
@@ -600,7 +611,7 @@ def read_histogram(sampling_period):
     # Delete old histogram data and start a new one
     if initiate_transmission(0x30):
         answer = spi.xfer([0x00] * 86)
-        print(answer)
+        logger.debug("SPI reading is:\r" + str(answer))
         # spi.close()
         logger.debug("Old histogram in the OPC-N3 deleted, starting a new one")
     else:
@@ -644,10 +655,12 @@ def read_histogram(sampling_period):
                      PM_A, PM_B,
                      PM_C, reject_count_glitch, reject_count_longTOF, reject_count_ratio, reject_count_Out_Of_Range,
                      fan_rev_count, laser_status):
-                print(bin, MToF, sampling_time, sample_flow_rate, temperature, relative_humidity,
-                     PM_A, PM_B,
-                     PM_C, reject_count_glitch, reject_count_longTOF, reject_count_ratio, reject_count_Out_Of_Range,
-                     fan_rev_count, laser_status)
+                logger.debug("SPI reading is:\r" + str(bin) + " " + str(MToF) + " " + str(sampling_time)
+                             + " " + str(sample_flow_rate) + " " + str(temperature) + " " + str(relative_humidity)
+                             + " " + str(PM_A) + " " + str(PM_B) + " " + str(PM_C) + " " + str(reject_count_glitch)
+                                         + " " + str(reject_count_longTOF) + " " + str(reject_count_ratio) + " "
+                                         + str(reject_count_Out_Of_Range) + " " + str(fan_rev_count)
+                                         + " " + str(laser_status))
                 # return TRUE if the data are correct, and execute the below
                 # rounding until 2 decimals, as this is the accuracy of the OPC-N3 for PM values
                 PM1 = round(struct.unpack('f', bytes(PM_A))[0], 2)
