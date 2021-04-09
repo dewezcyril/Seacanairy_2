@@ -104,6 +104,7 @@ def get_raw_reading():
         time.sleep(1)
         ser.flush()
         try:
+            print("Synchronizing...", end='\r')
             ser.read_all()  # delete all corrupted data
             ser.flush()  # flush the buffer
             time.sleep(1)
@@ -296,7 +297,7 @@ def get_position():
     data = decode_NMEA(reading)
     print("Current time:\t", data["UTC"])
     print("Latitude:\t", data["latitude"], "\t|\tLongitude:\t", data["longitude"])
-    print("SOG:\t\t", data["SOG"], "\t\t|\tCOG:\t", end='')
+    print("SOG:\t\t", data["SOG"], "kts", "\t\t|\tCOG:\t", end='')
     if data["COG"] == '':
         print("none")
     else:

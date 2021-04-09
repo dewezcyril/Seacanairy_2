@@ -145,20 +145,22 @@ def wait_timestamp(starting_time):
     """
     finishing_time = time.time()
     next_launching = starting_time + sampling_period  # time at which the next sample should start
-    to_wait = round(next_launching - finishing_time, 0)  # amount of time system will wait
 
     # if the sampling process took more time than the sampling period
     if finishing_time >= next_launching:
         logger.error("Measurement took more time than required (" + str(round(sampling_period, 0)) + " seconds)")
         return
 
-    # As long as the current time is smaller than the starting time...
-    for i in range(0, int(to_wait)):
-        if time.time() < next_launching:
-            print("Waiting before next measurement: ", int(to_wait) - i, "seconds (sampling time is set on",
+    while True:
+        now = time.time()
+        if now < next_launching:
+            to_wait = round(next_launching - now, 0)  # amount of time system will wait
+            print("Waiting before next measurement:", int(to_wait), "seconds (sampling time is set on",
                   sampling_period,
                   "seconds)", end="\r")
-            time.sleep(1)
+            time.sleep(.2)
+        else:
+            break
 
     # Delete the waiting countdown and skip a line
     # Print a whole blank to remove completely the previous line ("Waiting before next measurement...")
@@ -192,11 +194,11 @@ if os.path.isfile(csv_file):  # if file exist
     logger.info("'" + str(csv_file) + "' already exist, appending data to this file")
 else:  # if file doesn't exist
     logger.info("Initiating '" + str(project_name) + "' file")
-    append_data_to_csv("Date/Time", "Relative Humidity", "Temperature", "Pressure",
-                       "CO2 average", "CO2 instant",
-                       "PM 1", "PM 2.5", "PM 10",
-                       "Temperature OPC", "Relative Humidity OPC",
-                       "sampling time OPC", "sample flow rate OPC",
+    append_data_to_csv("Date/Time", "Relative Humidity (%RH)", "Temperature (°C)", "Pressure (hPa)",
+                       "CO2 average (ppm)", "CO2 instant (ppm)",
+                       "PM 1 (μg/m³)", "PM 2.5 (μg/m³)", "PM 10 (μg/m³)",
+                       "Temperature OPC (°C)", "Relative Humidity OPC (%RH)",
+                       "sampling time OPC (sec)", "sample flow rate OPC (ml/s)",
                        "bin 0", "bin 1", "bin 2", "bin 3", "bin 4", "bin 5",
                        "bin 6", "bin 7", "bin 8", "bin 9", "bin 10", "bin 11",
                        "bin 12", "bin 13", "bin 14", "bin 15", "bin 16", "bin 17",
@@ -204,8 +206,8 @@ else:  # if file doesn't exist
                        "bin 1 MToF", "bin 3 MToF", "bin 5 MToF", "bin 7 MToF",
                        "reject count glitch", "reject count long TOF", "reject count ratio",
                        "reject count out of range", "fan revolution count", "laser status",
-                       "GPS fix time", "latitude", "longitude", "SOG", "COG", "horizontal precision",
-                       "altitude", "WGS84 correction", "fix status")
+                       "GPS fix time (UTC)", "latitude", "longitude", "SOG (kts)", "COG", "horizontal dilution of precision",
+                       "altitude (m)", "WGS84 correction (m)", "fix status")
 
     # SET INTERNAL CO2 SENSOR TIMESTAMP
 

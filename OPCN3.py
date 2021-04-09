@@ -678,7 +678,8 @@ def read_histogram(sampling_period):
                 sampling_time = join_bytes(sampling_time) / 100
                 print(" Sampling period:", sampling_time, "seconds", end="\t\t|\t")
                 sample_flow_rate = join_bytes(sample_flow_rate) / 100
-                print(" Sampling flow rate:", sample_flow_rate, "ml/s |", round(sample_flow_rate * 60, 2), "mL/min")
+                print(" Sampling flow rate:", sample_flow_rate, "ml/s |", round(sample_flow_rate * 60, 2), "mL/min |",
+                      round(sample_flow_rate * 60 * 60 / 1000, 2), "L/h")
 
                 reject_count_glitch = join_bytes(reject_count_glitch)
                 print(" Reject count glitch:", reject_count_glitch, end="\t\t|\t")
