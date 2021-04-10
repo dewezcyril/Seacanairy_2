@@ -293,7 +293,8 @@ def get_position():
         "altitude": "error",
         "WGS84 correction": "error",
         "current time": "error",
-        "fix status": "error"
+        "fix status": "error",
+        "accuracy": "error"
     }  # you must return all those items to avoid bugs in seacanairy.py (f-e looking for an item which doesn't exist)
 
     while attempts <= 4:
@@ -315,7 +316,9 @@ def get_position():
             else:  # if there are no errors, then exit the loop and proceed
                 break
 
-    print("Current time:\t", to_return["fix date"], to_return["current time"])
+    to_return["current time"] = to_return["fix date"] + " " + to_return["current time"]
+
+    print("Current time:\t", to_return["current time"])
     print("Latitude:\t", to_return["latitude"], "\t|\tLongitude:\t", to_return["longitude"])
     print("Altitude:\t", to_return["altitude"], "\t\t|\tWGS84 correction:", to_return["WGS84 correction"])
     print("SOG:\t\t", to_return["SOG"], "kts", "\t\t|\tCOG:\t\t ", end='')
@@ -326,6 +329,7 @@ def get_position():
     print("Horizontal deviation:\t", to_return["horizontal precision"])
     print("Fix date/time:\t", to_return["fix date and time"], "UTC", "\t|\tGPS mode:\t", to_return["fix status"])
     print("Accuracy:\t", to_return["accuracy"], "\t\t|\tGPS status:\t", to_return["status"])
+
     return to_return
 
 

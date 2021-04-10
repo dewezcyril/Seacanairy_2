@@ -186,9 +186,10 @@ if not os.path.isfile(csv_file):  # if the file doesn't exist
                        "bin 1 MToF", "bin 3 MToF", "bin 5 MToF", "bin 7 MToF",
                        "reject count glitch", "reject count long TOF", "reject count ratio",
                        "reject count out of range", "fan revolution count", "laser status",
-                       "GPS fix date and time (dd-mm-yy UTC)", "latitude", "longitude", "SOG (kts)", "COG",
-                       "horizontal dilution of precision",
-                       "altitude (m)", "WGS84 correction (m)", "fix status")
+                       "Date and time (UTC)",
+                       "GPS fix date and time (UTC)", "latitude", "longitude", "SOG (kts)", "COG",
+                       "horizontal dilution of precision", "accuracy",
+                       "altitude (m)", "WGS84 correction (m)", "fix type", "sensor status")
 else:
     logger.info("'" + str(csv_file) + "' already exist, appending data to this file")
 
@@ -278,9 +279,10 @@ while True:
         # Get GPS information
         print("********************** GPS **********************")
         GPS_data = GPS.get_position()
-        to_write += [GPS_data["fix date and time"], GPS_data["latitude"], GPS_data["longitude"],
-                     GPS_data["SOG"], GPS_data["COG"], GPS_data["horizontal precision"],
-                     GPS_data["altitude"], GPS_data["WGS84 correction"], GPS_data["fix status"]]
+        to_write += [GPS_data["current time"], GPS_data["fix date and time"],
+                     GPS_data["latitude"], GPS_data["longitude"],
+                     GPS_data["SOG"], GPS_data["COG"], GPS_data["horizontal precision"], GPS_data["accuracy"],
+                     GPS_data["altitude"], GPS_data["WGS84 correction"], GPS_data["fix status"], GPS_data["status"]]
 
     # Store everything in the csv file
     append_data_to_csv(now, *to_write)
