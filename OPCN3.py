@@ -99,7 +99,7 @@ else:  # if this file is considered as a library (if you execute 'seacanairy.py'
 bus = 0  # name of the SPI bus on the Raspberry Pi 3B+
 device = 0  # name of the SS (Ship Selection) pin used for the OPC-N3
 spi = spidev.SpiDev()  # enable SPI (SPI must be enable in the RPi settings beforehand)
-spi.open(bus, device)
+spi.open(bus, device)  # open the spi port at start
 spi.max_speed_hz = 307200  # 750 kHz
 spi.mode = 0b01  # bytes(0b01) = int(1) --> SPI mode 1
 # first bit (from right) = CPHA = 0 --> data are valid when clock is rising
@@ -147,7 +147,6 @@ def initiate_transmission(command_byte):
     stop = time.time() + time_available_for_initiate_transmission
     # time in seconds at which we consider it took too much time to answer
 
-    spi.open(0, 0)  # open the serial port
     # cs_low()  # not used anymore
 
     while time.time() < stop:
@@ -857,7 +856,7 @@ def getdata(flushing_time, sampling_time):
         else:
             logger.critical("Skipping histogram reading")
         fan_off()
-        spi.close()
+        # spi.close()
         return to_return
 
     except(KeyboardInterrupt, SystemExit):  # in case of error AND if user stop the software

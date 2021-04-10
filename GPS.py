@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 import serial  # install libraries
 import time
 import yaml
@@ -104,7 +106,7 @@ def get_raw_reading():
         time.sleep(1)
         ser.flush()
         try:
-            print("Synchronizing...", end='\r')
+            print("Synchronizing...                          ", end='\r')
             ser.read_all()  # delete all corrupted data
             ser.flush()  # flush the buffer
             time.sleep(1)
@@ -147,67 +149,67 @@ def decode_NMEA(data):
     WGS84 correction, UTC, fix status)
     """
     data = data.split("\r\n")  # create a list of lines (\r\n is sent by the sensor at the end of each line)
-    to_return = {
-        "fix time": "unknown",
-        "latitude": "unknown",
-        "longitude": "unknown",
-        "SOG": "unknown",
-        "COG": "unknown",
-        "status": "unknown",
-        "horizontal precision": "unknown",
-        "altitude": "unknown",
-        "WGS84 correction": "unknown",
-        "UTC": "unknown",
-        "fix status": "unknown"
-    }  # you must return all those items to avoid bugs in seacanairy.py (f-e looking for an item which doesn't exist)
+    to_return = {}
     for i in range(len(data)):  # don't know at which line data will be send, so it will search for the good line
-        print(data[i], end='              \r')
-        time.sleep(.2)  # let a bit of time for the user to see the data returned by the GPS
+        print(data[i], end='\r')
+        time.sleep(.1)  # let a bit of time for the user to see the data returned by the GPS
         print("                                                                                          ", end='\r')
         if data[i][0:6] == "$GPRMC":
             if check(data[i]):
                 GPRMC = data[i].split(",")
+                fix_time = GPRMC[1][0:2] + ":" + GPRMC[1][2:4] + ":" + GPRMC[1][4:6]
+                date = GPRMC[9][0:2] + "-" + GPRMC[9][2:4] + "-" + GPRMC[9][4:6]
+                to_return.update({
+                    "fix date and time": date + " " + fix_time,
+                    "fix date": date,
+                    "fix time": fix_time,
+                })
                 if GPRMC[2] == "V":  # indicate that GPS is not working good
                     logger.warning("GPS does not receive signal")
-                    status = "NOK"
-                    to_return.update({"status": status})
+                    to_return.update({
+                        "status": "NOK",
+                        "latitude": "no fix",
+                        "longitude": "no fix",
+                        "SOG": "no fix",
+                        "COG": "no fix",
+                    })
                     return to_return
-                if GPRMC[2] == "A":  # indicate that GPS is working fine
-                    fix_time = GPRMC[1][0:2] + ":" + GPRMC[1][2:4] + ":" + GPRMC[1][4:6] + " UTC"
-                    status = "OK"
+                elif GPRMC[2] == "A":  # indicate that GPS is working fine
                     latitude = lat_long_decode(GPRMC[3], GPRMC[4])
                     longitude = lat_long_decode(GPRMC[5], GPRMC[6])
                     SOG = GPRMC[7]
                     COG = GPRMC[8]
 
                     to_return.update({
-                        "fix time": fix_time,
                         "latitude": latitude,
                         "longitude": longitude,
                         "SOG": SOG,
                         "COG": COG,
-                        "status": status
+                        "status": "OK"
                     })
 
                 else:
                     logger.critical("Something wrong with the GPRMC data, GPS satus returned is: " + str(GPRMC[2]))
 
-        elif data[i][0:6] == "&GPGSA":
-            if check(data[i]):
-                GPGSA = data[i].split(",")
-                horizontal_precision = GPGSA[-1]
-
-                to_return.update({
-                    "horizontal precision": horizontal_precision
-                })
-
         elif data[i][0:6] == "$GPGGA":
             if check(data[i]):
                 GPGGA = data[i].split(",")
-                UTC = GPGGA[1][0:2] + ":" + GPGGA[1][2:4] + ":" + GPGGA[1][4:6] + " UTC"
+                current_time = GPGGA[1][0:2] + ":" + GPGGA[1][2:4] + ":" + GPGGA[1][4:6] + " UTC"
                 altitude = GPGGA[9] + " " + GPGGA[10]
                 WGS84_correction = GPGGA[11] + " " + GPGGA[12]
                 position_fix_status_indicator = GPGGA[6]
+                horizontal_precision = float(GPGGA[8])
+                accuracy = ''
+                if horizontal_precision < 2:
+                    accuracy = "very good"
+                elif 2 <= horizontal_precision < 3:
+                    accuracy = "good"
+                elif 3 <= horizontal_precision < 5:
+                    accuracy = "average"
+                elif 5 <= horizontal_precision < 6:
+                    accuracy = "poor"
+                elif horizontal_precision >= 6:
+                    accuracy = "very poor"
                 if position_fix_status_indicator == '0':
                     fix_status = "No fix/invalid"
                 elif position_fix_status_indicator == '1':
@@ -225,10 +227,11 @@ def decode_NMEA(data):
                     "altitude": altitude,
                     "WGS84 correction": WGS84_correction,
                     "fix status": fix_status,
-                    "UTC": UTC
+                    "current time": current_time,
+                    "horizontal precision": horizontal_precision,
+                    "accuracy": accuracy
                 })
 
-    logger.debug("GPS reading is:" + str(to_return))
     return to_return
 
 
@@ -263,8 +266,7 @@ def check(NMEAstring):
         logger.debug("Checksum is correct")
         return True
     else:
-        logger.debug("Checksum is not correct")
-        logger.debug("Calculation is" + str(calc) + "| sensor's checksum is" + str(checksum))
+        logger.warning("Checksum is not correct: calculation is " + str(calc) + "| sensor's checksum is " + str(checksum))
         return False
 
 
@@ -275,37 +277,58 @@ def get_position():
                 horizontal precision, altitude, WGS84 correction)
     """
     logger.debug("Get position")
-    reading = get_raw_reading()
 
-    if not reading:
-        logger.critical("Failed to retrieve GPS data")
-        to_return = {
-            "fix time": "unknown",
-            "latitude": "unknown",
-            "longitude": "unknown",
-            "SOG": "unknown",
-            "COG": "unknown",
-            "status": "unknown",
-            "horizontal precision": "unknown",
-            "altitude": "unknown",
-            "WGS84 correction": "unknown",
-            "UTC": "unknown",
-            "fix status": "unknown"
-        }
-        return to_return
+    attempts = 1
 
-    data = decode_NMEA(reading)
-    print("Current time:\t", data["UTC"])
-    print("Latitude:\t", data["latitude"], "\t|\tLongitude:\t", data["longitude"])
-    print("SOG:\t\t", data["SOG"], "kts", "\t\t|\tCOG:\t", end='')
-    if data["COG"] == '':
-        print("none")
+    to_return = {
+        "fix date and time": "error",
+        "fix date": "error",
+        "fix time": "error",
+        "latitude": "error",
+        "longitude": "error",
+        "SOG": "error",
+        "COG": "error",
+        "status": "error",
+        "horizontal precision": "error",
+        "altitude": "error",
+        "WGS84 correction": "error",
+        "current time": "error",
+        "fix status": "error"
+    }  # you must return all those items to avoid bugs in seacanairy.py (f-e looking for an item which doesn't exist)
+
+    while attempts <= 4:
+        reading = get_raw_reading()
+        if not reading:  # if it failed to read UART, it returns False
+            logger.critical("Unable to read GPS data, skipping reading")
+            return to_return  # return a dictionary full of "error"
+        else:
+            data = decode_NMEA(reading)  # decode the raw reading
+            to_return.update(data)  # update the dictionary with the data the function got
+            logger.debug("'to_return' is:\r" + str(to_return))
+            # At each trial, it will update the dictionary
+            if "error" in to_return.values():  # if the dictionary contains an error, try again
+                attempts += 1
+                if attempts >= 4:  # if the system has tried 3 times to read the data but that there are still errors
+                    logger.error("Tried 3 times to get full GPS data, still a value 'error'")
+                    break  # exit the loop and print the data anyway
+                logger.warning("Data missing in GPS transmission, reading again (" + str(attempts) + "/3)")
+            else:  # if there are no errors, then exit the loop and proceed
+                break
+
+    print("Current time:\t", to_return["fix date"], to_return["current time"])
+    print("Latitude:\t", to_return["latitude"], "\t|\tLongitude:\t", to_return["longitude"])
+    print("Altitude:\t", to_return["altitude"], "\t\t|\tWGS84 correction:", to_return["WGS84 correction"])
+    print("SOG:\t\t", to_return["SOG"], "kts", "\t\t|\tCOG:\t\t ", end='')
+    if to_return["COG"] == '':
+        print("no speed")
     else:
-        print(data["COG"])
-    print("Status:\t", data["status"])
-    return data
+        print(to_return["COG"])
+    print("Horizontal deviation:\t", to_return["horizontal precision"])
+    print("Fix date/time:\t", to_return["fix date and time"], "UTC", "\t|\tGPS mode:\t", to_return["fix status"])
+    print("Accuracy:\t", to_return["accuracy"], "\t\t|\tGPS status:\t", to_return["status"])
+    return to_return
 
 
 if __name__ == '__main__':
-    pos = get_position()
-    print(pos)
+    get_position()
+    time.sleep(1)

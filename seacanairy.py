@@ -14,7 +14,6 @@ import os
 import yaml
 import logging
 
-
 # ---------------------------------------
 # SETTINGS
 # ---------------------------------------
@@ -70,12 +69,7 @@ log_file = directory_path + "-log.log"
 if not os.path.isfile(log_file):
     os.mknod(log_file)
     print("Created log file", log_file)
-
-# Create the file to store the data if it doesn't exist
-csv_file = directory_path + "/" + str(project_name) + "-data.csv"
-if not os.path.isfile(csv_file):
-    os.mknod(csv_file)
-    print("Created data file", csv_file)
+# You can't go further in the program without making those two steps first.
 
 # -----------------------------------------
 # IMPORT NECESSARY SENSORS
@@ -90,7 +84,6 @@ if OPCN3_activation:
 
 if GPS_activation:
     import GPS  # Library for the GPS
-
 
 # -----------------------------------------
 # LOGGING
@@ -173,6 +166,32 @@ def wait_timestamp(starting_time):
 # MAIN CODE
 # --------------------------------------------
 
+# INITIATE CSV FILE
+
+# Create the file to store the data if it doesn't exist
+csv_file = directory_path + "/" + str(project_name) + "-data.csv"
+if not os.path.isfile(csv_file):  # if the file doesn't exist
+    os.mknod(csv_file)  # create the file
+    print("Created data file", csv_file)
+    # Write a first line to the file, this will be the column headers
+    append_data_to_csv("Date/Time", "Relative Humidity (%RH)", "Temperature (°C)", "Pressure (hPa)",
+                       "CO2 average (ppm)", "CO2 instant (ppm)",
+                       "PM 1 (μg/m³)", "PM 2.5 (μg/m³)", "PM 10 (μg/m³)",
+                       "Temperature OPC (°C)", "Relative Humidity OPC (%RH)",
+                       "sampling time OPC (sec)", "sample flow rate OPC (ml/s)",
+                       "bin 0", "bin 1", "bin 2", "bin 3", "bin 4", "bin 5",
+                       "bin 6", "bin 7", "bin 8", "bin 9", "bin 10", "bin 11",
+                       "bin 12", "bin 13", "bin 14", "bin 15", "bin 16", "bin 17",
+                       "bin 18", "bin 19", "bin 20", "bin 21", "bin 22", "bin 23",
+                       "bin 1 MToF", "bin 3 MToF", "bin 5 MToF", "bin 7 MToF",
+                       "reject count glitch", "reject count long TOF", "reject count ratio",
+                       "reject count out of range", "fan revolution count", "laser status",
+                       "GPS fix date and time (dd-mm-yy UTC)", "latitude", "longitude", "SOG (kts)", "COG",
+                       "horizontal dilution of precision",
+                       "altitude (m)", "WGS84 correction (m)", "fix status")
+else:
+    logger.info("'" + str(csv_file) + "' already exist, appending data to this file")
+
 now = datetime.now()  # get time
 logger.info("Starting of Seacanairy on the " + str(now.strftime("%d/%m/%Y at %H:%M:%S")))  # delete time decimals
 
@@ -186,28 +205,6 @@ if not OPCN3_activation:
 
 if not GPS_activation:
     logger.warning("GPS has been disabled by the user in 'seacanairy_settings.yaml'")
-
-    # INITIATE CSV FILE
-
-# Check that the data file exist, if not, write the first line (which is the columns' name)
-if os.path.isfile(csv_file):  # if file exist
-    logger.info("'" + str(csv_file) + "' already exist, appending data to this file")
-else:  # if file doesn't exist
-    logger.info("Initiating '" + str(project_name) + "' file")
-    append_data_to_csv("Date/Time", "Relative Humidity (%RH)", "Temperature (°C)", "Pressure (hPa)",
-                       "CO2 average (ppm)", "CO2 instant (ppm)",
-                       "PM 1 (μg/m³)", "PM 2.5 (μg/m³)", "PM 10 (μg/m³)",
-                       "Temperature OPC (°C)", "Relative Humidity OPC (%RH)",
-                       "sampling time OPC (sec)", "sample flow rate OPC (ml/s)",
-                       "bin 0", "bin 1", "bin 2", "bin 3", "bin 4", "bin 5",
-                       "bin 6", "bin 7", "bin 8", "bin 9", "bin 10", "bin 11",
-                       "bin 12", "bin 13", "bin 14", "bin 15", "bin 16", "bin 17",
-                       "bin 18", "bin 19", "bin 20", "bin 21", "bin 22", "bin 23",
-                       "bin 1 MToF", "bin 3 MToF", "bin 5 MToF", "bin 7 MToF",
-                       "reject count glitch", "reject count long TOF", "reject count ratio",
-                       "reject count out of range", "fan revolution count", "laser status",
-                       "GPS fix time (UTC)", "latitude", "longitude", "SOG (kts)", "COG", "horizontal dilution of precision",
-                       "altitude (m)", "WGS84 correction (m)", "fix status")
 
     # SET INTERNAL CO2 SENSOR TIMESTAMP
 
@@ -281,7 +278,7 @@ while True:
         # Get GPS information
         print("********************** GPS **********************")
         GPS_data = GPS.get_position()
-        to_write += [GPS_data["fix time"], GPS_data["latitude"], GPS_data["longitude"],
+        to_write += [GPS_data["fix date and time"], GPS_data["latitude"], GPS_data["longitude"],
                      GPS_data["SOG"], GPS_data["COG"], GPS_data["horizontal precision"],
                      GPS_data["altitude"], GPS_data["WGS84 correction"], GPS_data["fix status"]]
 
