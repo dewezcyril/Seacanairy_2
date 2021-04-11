@@ -18,7 +18,7 @@ _Other files are no more used_
 # Link to the official documentation
 ### Raspberry Pi
 All the sensors are connected to a *Raspberry Pi 3B+*
-* At start, the good UART (PL011) is connected to the Bluetooth. The UART connected to the GPIO is the miniUART and is interfaring with the other sensors.
+* At start, the good UART (PL011) is connected to the Bluetooth. The UART connected to the GPIO is the miniUART and is interfering with the other sensors.
 * To use all those sensors properly, you must deactivate the Bluetooth in `/boot/config.txt` to connect the PL001 to the GPIO.
 * The baudrate of the UART and SPI ports must be a multiple. If not, the data transmitted via SPI and UART are corrupted.
 ### E+E Elektronik EE894 CO2 sensor
