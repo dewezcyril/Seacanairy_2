@@ -1,31 +1,30 @@
 #! /home/pi/seacanairy_project/venv/bin/python3
 """
-Main Seacanairy Python Code that execute all the necessary functions to make the system work and take sample
-at required intervals
+This code aims to make the whole Seacanairy works! It start the pump, read the date from the CO2 sensor,
+the OPC-N3, the AFE board, the GPS, stop the pump, and store the whole in a file.
 """
 
 # import all libraries
 import time
 from datetime import date, datetime, timedelta
 import csv  # for storing data in file
-from progress.bar import IncrementalBar
-import os.path
-import os
-import yaml
-import logging
-import RPi.GPIO as GPIO
+from progress.bar import IncrementalBar  # to show beautiful loading bar on the screen during sampling
+import os  # to be able to create new files/folders and see the current path
+import yaml  # to read the settings stored in the 'seacanairy_settings.yaml' file
+import logging  # to store the errors messages in a separate log file
+import RPi.GPIO as GPIO  # to put GPIO high/low to switch the air pump relay on and off
 
 # ---------------------------------------
 # SETTINGS
 # ---------------------------------------
 # Import the settings from the Yaml file
-# Store the different settings in dedicated variables
+# Store the different settings in dedicated variables to get it more easy
 
-current_working_directory = str(os.getcwd())
+current_working_directory = str(os.getcwd())  # returns the path where the python script is currently running
 
 with open(current_working_directory + '/seacanairy_settings.yaml') as file:
-    settings = yaml.safe_load(file)
-    file.close()  # always close the used files after use
+    settings = yaml.safe_load(file)  # load all the yaml file in a dictionary
+    file.close()  # always close the file after use
 
 # Sampling period
 sampling_period = settings['Seacanairy settings']['Sampling period']
@@ -37,10 +36,10 @@ CO2_sampling_period = int(sampling_period / settings['CO2 sensor']['Automatic sa
 # Amount of time required for the CO2 sensor to take the measurement
 CO2_startup_delay = settings['CO2 sensor']['Amount of time required for the sensor to take the measurement']
 
-# Name of the research (f-e 'Air measurement in my room'
+# Name of the research (f-e 'Air measurement in my room')
 project_name = settings['Seacanairy settings']['Sampling session name']
 
-# Amound of time while the OPCN3 fan keep running without measurement
+# Amount of time while the OPCN3 fan keep running without measurement to flush fresh air inside the casing
 OPC_flushing_time = settings['OPC-N3 sensor']['Flushing time']
 
 # Amount of time the OPCN3's laser takes PM sample
@@ -51,12 +50,13 @@ OPC_fan_speed = settings['OPC-N3 sensor']['Fan speed']
 
 # Let the user choose if he want to activate the following sensor or not
 # Seen the problems encountered with GPS and OPCN3, could be good to disable the unnecessary sensors (GPS f-e)
+# This does not shut down the sensor alimentation
 CO2_activation = settings['CO2 sensor']['Activate this sensor']
 OPCN3_activation = settings['OPC-N3 sensor']['Activate this sensor']
 GPS_activation = settings['GPS']['Activate this sensor']
 AFE_activation = settings['AFE Board']['Activate this sensor']
 
-# Pump settings
+# Air pump settings
 fresh_air_piping_flushing_time = settings['Seacanairy settings']['Flushing time before measurement']
 
 # -----------------------------------------
@@ -66,21 +66,22 @@ fresh_air_piping_flushing_time = settings['Seacanairy settings']['Flushing time 
 # Create a directory to store everything if it doesn't exit
 directory_path = current_working_directory + "/" + project_name
 if not os.path.exists(directory_path):
-    os.mkdir(directory_path)
+    os.mkdir(directory_path)  # create the directory
     print("Created directory", directory_path)
 
 # Create a file to store the log if it doesn't exist
 log_file = directory_path + "-log.log"
 if not os.path.isfile(log_file):
-    os.mknod(log_file)
+    os.mknod(log_file)  # create the file
     print("Created log file", log_file)
-# You can't go further in the program without making those two steps first.
+# You can't go further in the program without creating the folder and the logger file
 
 # -----------------------------------------
 # IMPORT NECESSARY SENSORS
 # -----------------------------------------
 # Seen the above settings, import the necessary libraries
 # Avoid starting module (i2c, SPI, UART) that will not be used
+
 if CO2_activation:
     import CO2  # Library for the CO2 sensor
 
@@ -96,11 +97,11 @@ if AFE_activation:
 # -----------------------------------------
 # LOGGING
 # -----------------------------------------
-
+# Save the messages shown on the console in a dedicated file to understand the possible issues afterwards
 
 message_level = logging.INFO
 
-# set up logging to file - see previous section for more details
+# set up logging to file
 logging.basicConfig(level=message_level,
                     format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
                     datefmt='%d-%m %H:%M:%S',
@@ -118,13 +119,17 @@ logging.getLogger().addHandler(console)
 
 logger = logging.getLogger('SEACANAIRY')
 
+# Following logging messages must be called by logger.debug (...)
+
 # -----------------------------------------
 # FUNCTIONS
 # -----------------------------------------
+# Use the GPIO to turn on and off the air pump via relay
 
 GPIO.setmode(GPIO.BCM)  # use the GPIO names (GPIO1...) instead of the processor pin name (BCM...)
 pump_gpio = 27
 GPIO.setup(pump_gpio, GPIO.OUT, initial=GPIO.LOW)
+
 
 # -----------------------------------------
 # FUNCTIONS
@@ -133,9 +138,10 @@ GPIO.setup(pump_gpio, GPIO.OUT, initial=GPIO.LOW)
 
 def loading_bar(name, delay):
     """
-    Show a loading bar on the screen during sampling for example
+    Show a loading bar on the screen during a a certain amount of time
+    Make the user understand the software is doing/waiting for something
     :param name: Text to be shown on the left of the loading bar
-    :param length: Number of increments necessary for the bar to be full
+    :param delay: Amount of time the system is waiting in seconds
     :return: nothing
     """
     bar = IncrementalBar(name, max=(2 * delay), suffix='%(elapsed)s/' + str(delay) + ' seconds')
@@ -147,23 +153,31 @@ def loading_bar(name, delay):
 
 
 def pump_start():
+    """
+    It put tension on the GPIO number 27 to turn on the air pump relay
+    :return: nothing
+    """
     GPIO.output(pump_gpio, GPIO.HIGH)
     print("Air pump is on")
 
 
 def pump_stop():
+    """
+    It remove tension from the GPIO number 27 to turn off the air pump relay
+    :return: nothing
+    """
     GPIO.output(pump_gpio, GPIO.LOW)
     print("Air pump is off")
 
 
 def append_data_to_csv(*data_to_write):
     """
-    Store all the measurements in the .csv file
+    Store all the arguments given in the -data.csv file
+    All arguments will be separated by a coma in the csv file
     :param data_to_write: unlimited amount of arguments
     :return: nothing
     """
-    # Concatenate all the arguments in one list
-    to_write = [*data_to_write]
+    to_write = [*data_to_write]  # Concatenate all the arguments in one list
 
     with open(csv_file, mode='a', newline='') as data_file:
         writer = csv.writer(data_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
@@ -175,15 +189,17 @@ def wait_timestamp(starting_time):
     """
     Wait that the sampling period is passed out to start the next measurement
     :param starting_time: time at which the measurement has started ('time.time()' required)
-    :return: Function stop when next measurement can start
+    :return: Nothing, function will stop when the next measurement can start
     """
     finishing_time = time.time()
     next_launching = starting_time + sampling_period  # time at which the next sample should start
 
-    # if the sampling process took more time than the sampling period
+    # if the sampling process took more time than the expected sampling period
     if finishing_time >= next_launching:
-        logger.error("Measurement took more time than required (" + str(round(sampling_period, 0)) + " seconds)")
-        return
+        logger.error("Sampling cycle took " + str(round((finishing_time - next_launching), 1)) +
+                     "seconds more than expected (" + str(round(sampling_period, 0)) + " seconds)")
+        print("Starting new sample...")
+        return  # function stop and new sample start
 
     while True:
         now = time.time()
@@ -200,12 +216,16 @@ def wait_timestamp(starting_time):
     # Print a whole blank to remove completely the previous line ("Waiting before next measurement...")
     print("                                                                                    ")
     print("Starting new sample...")
-    return
+    return  # function stop and new sample start
 
 
 # --------------------------------------------
 # MAIN CODE
 # --------------------------------------------
+# Keep a trace of the day and time at which the system has started
+
+now = datetime.now()  # get time
+logger.info("Starting of Seacanairy on the " + str(now.strftime("%d/%m/%Y at %H:%M:%S")))  # delete time decimals
 
 # INITIATE CSV FILE
 
@@ -238,9 +258,6 @@ if not os.path.isfile(csv_file):  # if the file doesn't exist
                        "altitude (m)", "WGS84 correction (m)", "fix type", "sensor status")
 else:
     logger.info("'" + str(csv_file) + "' already exist, appending data to this file")
-
-now = datetime.now()  # get time
-logger.info("Starting of Seacanairy on the " + str(now.strftime("%d/%m/%Y at %H:%M:%S")))  # delete time decimals
 
 # WARN USER IF A SENSOR IS DEACTIVATED
 
@@ -282,15 +299,16 @@ if CO2_activation:
 while True:
     # Get date and time to store in the Excel file
     now = datetime.now()
-    now = now.strftime("%Y-%m-%d %H:%M:%S")
+    now = now.strftime("%d-%m-%Y %H:%M:%S")  # remove the decimals and change the date order
 
     # Get the time in second at which the measurement start
     start = time.time()  # return the time expressed in second since the python date reference
     # a bit the same as 'millis()' on Arduino
-    # easier to work with than with a complex datetime format and a timedelta function...
+    # easier to work with than with a complex string datetime format and a timedelta function...
 
-    pump_start()
+    pump_start()  # start the pump
 
+    # If user want to flush the piping system before beginning the sampling
     if fresh_air_piping_flushing_time != 0:
         loading_bar('Flushing fresh air in the piping system', fresh_air_piping_flushing_time)
 
@@ -333,8 +351,7 @@ while True:
                      AFE_data["NO2 ppm"], AFE_data["NO2 main"], AFE_data["NO2 aux"],
                      AFE_data["OX ppm"], AFE_data["OX main"], AFE_data["OX aux"],
                      AFE_data["SO2 ppm"], AFE_data["SO2 main"], AFE_data["SO2 aux"],
-                     AFE_data["CO ppm"], AFE_data["CO main"], AFE_data["CO aux"]
-                     ]
+                     AFE_data["CO ppm"], AFE_data["CO main"], AFE_data["CO aux"]]
 
     pump_stop()
 

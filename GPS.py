@@ -1,6 +1,13 @@
+"""
+Library for the use of the U-BLOX-7 GNSS module (Velleman VMA430)
+Get the data from the UART port
+Convert the NMEA protocol and extract the useful information
+Should work with other UART GNSS devices
+"""
+
 from datetime import datetime, timezone
 
-import serial  # install libraries
+import serial  # UART libraries, to install this library: pip3 install pyserial
 import time
 import yaml
 import logging
@@ -79,7 +86,8 @@ else:  # if this file is considered as a library (if you execute 'seacanairy.py'
 # --------------------------------------------------------
 # GPIO SETTINGS
 # --------------------------------------------------------
-#
+# Used during developing to synchronize the UART reading with the GPS pulse
+# spi.readall() make this sep unnecessary
 # GPIO.setmode(GPIO.BCM)
 # GPIO.setup(25, GPIO.OUT, initial=GPIO.LOW, pull_up_down=GPIO.PUD_DOWN)
 # GPIO.output(25, GPIO.LOW)
@@ -94,7 +102,8 @@ else:  # if this file is considered as a library (if you execute 'seacanairy.py'
 def get_raw_reading():
     """
     Get raw GPS reading via UART
-    :return:
+    Read all the lines available on the UART port
+    :return: raw data from the GPS
     """
     port = '/dev/ttyAMA0'
     try:
@@ -128,10 +137,10 @@ def get_raw_reading():
 
 def lat_long_decode(raw_position, compas):
     """
-    Decode longitude and latitude data from NMEA
+    Decode longitude and latitude data from NMEA into readable format
     :param raw_position: raw longitude/latitude word
     :param compas: compas (N/S/W/E)
-    :return: decoded latitude/longitude
+    :return: string(decoded latitude/longitude)
     """
     position = raw_position.split(".")
     min = position[0][-2:]
@@ -143,16 +152,17 @@ def lat_long_decode(raw_position, compas):
 
 def decode_NMEA(data):
     """
-    Decode the NMEA script and get useful data
+    Decode the NMEA script and get the useful data
+    Only the necessary data are extracted from the frames
     :param data: whole string returned by the GPS (all the lines of the NMEA)
-    :return: dictionary (fix time, latitude, longitude, SOG, COG, status, horizontal precision, altitude,
-    WGS84 correction, UTC, fix status)
+    :return:    Dictionary{fix time, fix date, fix date and time, latitude, longitude, SOG, COG, status,
+                horizontal precision, altitude, WGS84 correction, current time, accuracy}
     """
     data = data.split("\r\n")  # create a list of lines (\r\n is sent by the sensor at the end of each line)
     to_return = {}
     for i in range(len(data)):  # don't know at which line data will be send, so it will search for the good line
         print(data[i], end='\r')
-        time.sleep(.1)  # let a bit of time for the user to see the data returned by the GPS
+        # time.sleep(.1)  # let a bit of time for the user to see the data returned by the GPS
         print("                                                                                          ", end='\r')
         if data[i][0:6] == "$GPRMC":
             if check(data[i]):
@@ -238,6 +248,7 @@ def decode_NMEA(data):
 def digest(string_line):
     """
     Calculate the checksum based on the transmitted data
+    Put the whole NMEA line in the argument, function will automatically remove the checksum at the end
     COPY-PASTED AND ADAPTED FROM WIKIPEDIA
     :param NMEAstring: line of data transmitted by the GPS
     :return:
@@ -245,23 +256,24 @@ def digest(string_line):
     calc_cksum = 0
     NMEAstring = string_line[1:-3]
     for s in NMEAstring:
-        # it is XOR of ech Unicode integer representation
+        # it is XOR of each Unicode integer representation
         calc_cksum ^= ord(s)
 
     calc_cksum = str(hex(calc_cksum))[2:]  # get hex representation
-    calc_cksum = calc_cksum.upper()
+    calc_cksum = calc_cksum.upper()  # convert the lowercase to uppercase (abc to ABC)
+    # if not, Python does not recognize this string as an hexadecimal
     return calc_cksum
 
 
-def check(NMEAstring):
+def check(NMEA_line):
     """
     Check that the data transmitted are correct
-    :param NMEAstring: line of data transmitted by the GPS
-    :param checksum: checksum returned by the
+    Put the whole line in the argument, function extract the checksum at the end on its own
+    :param NMEA_line: one line of data transmitted by the GPS
     :return: True (data are corrects), False (data are not corrects)
     """
-    calc = digest(NMEAstring)
-    checksum = NMEAstring[-2:]
+    calc = digest(NMEA_line)
+    checksum = NMEA_line[-2:]  # extract the checksum, the two last characters
     if calc == checksum:
         logger.debug("Checksum is correct")
         return True
@@ -273,8 +285,8 @@ def check(NMEAstring):
 def get_position():
     """
     Get position and all other data from the GPS
-    :return:    Dictionary(fix time, latitude, longitude, SOG, COG, status,
-                horizontal precision, altitude, WGS84 correction)
+    :return:    Dictionary{fix time, fix date, fix date and time, latitude, longitude, SOG, COG, status,
+                horizontal precision, altitude, WGS84 correction, current time, accuracy}
     """
     logger.debug("Get position")
 
@@ -334,5 +346,6 @@ def get_position():
 
 
 if __name__ == '__main__':
+    print("GPS.py is running alone")
     get_position()
     time.sleep(1)

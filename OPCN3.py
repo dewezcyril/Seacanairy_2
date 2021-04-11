@@ -1,6 +1,6 @@
 #! /home/pi/seacanairy_project/venv/bin/python3
 """
-Library for the use and operation of Alphasense OPC-N3 sensor
+Library for the use and operation of the Alphasense OPC-N3 sensor
 """
 
 import spidev  # driver for the SPI/serial communication
@@ -8,14 +8,14 @@ import time
 import struct  # to convert the IEEE bytes to float
 import datetime
 import sys
-import os
-from progress.bar import IncrementalBar  # progress bar during sampling
-# import RPi.GPIO as GPIO
+import os  # to create folders/files and read current path
+from progress.bar import IncrementalBar  # beautiful progress bar during sampling
+# import RPi.GPIO as GPIO  # used for CS (Chip Select line)
 
-import logging
+import logging  # save logger messages into memory
 
 # yaml settings
-import yaml
+import yaml  # read user settings
 
 # --------------------------------------------------------
 # YAML SETTINGS
@@ -40,11 +40,12 @@ take_new_sample_if_checksum_is_wrong = \
     settings['OPC-N3 sensor'][
         'Take a new measurement if checksum is wrong (avoid shorter sampling periods when errors)']
 
+
 # --------------------------------------------------------
 # LOGGING SETTINGS
 # --------------------------------------------------------
 # all the settings and other code for the logging
-# logging = tak a trace of some messages in a file to be reviewed afterward (check for errors fe)
+# logging = keep a trace of some messages in a file to be reviewed afterward (check for errors f-e)
 
 
 def set_logger(message_level, log_file):
@@ -89,33 +90,37 @@ else:  # if this file is considered as a library (if you execute 'seacanairy.py'
     # no need to add a handler, because there is already one in seacanairy.py
     logger = set_logger(message_level, log_file)
 
-
 # ----------------------------------------------
 # SPI CONFIGURATION
 # ----------------------------------------------
 # configuration of the Serial communication to the sensor
 
 
-bus = 0  # name of the SPI bus on the Raspberry Pi 3B+
+bus = 0  # name of the SPI bus on the Raspberry Pi 3B+, only one bus
 device = 0  # name of the SS (Ship Selection) pin used for the OPC-N3
 spi = spidev.SpiDev()  # enable SPI (SPI must be enable in the RPi settings beforehand)
 spi.open(bus, device)  # open the spi port at start
-spi.max_speed_hz = 307200  # 750 kHz
+spi.max_speed_hz = 307200  # must be between 300 and 750 kHz
+# Personal experiment shown that UART and SPI speeds must be multiple
+# UART baud rate is 9600 for the GPS sensor
+# 9600 * 2 * 2 * 2 * 2 * 2 = 307200
+# If not, both sensor data are corrupted
+# If not, OPCN3 returns alternately int(48) = hex(0x30) = bytes(00110000)
 spi.mode = 0b01  # bytes(0b01) = int(1) --> SPI mode 1
 # first bit (from right) = CPHA = 0 --> data are valid when clock is rising
 # second bit (from right) = CPOL = 0 --> clock is kept low when idle
 wait_10_milli = 0.015  # 15 ms
 wait_10_micro = 1e-06
 wait_reset_SPI_buffer = 3  # seconds
-time_available_for_initiate_transmission = 10  # seconds - amount of time for the system to initiate transmission
+time_available_for_initiate_transmission = 10  # seconds - timeout for SPI response
 
 
 # if the sensor is disconnected, it can happen that the RPi wait for its answer, which never comes...
 # avoid the system to wait for unlimited time for that answer
 
-# CS (chip selection) manually via GPIO - NOT USED ANYMORE, WORKS GOOD WITH THE BUILD IN CS LINE
+# CS (chip selection) manually via GPIO - NOT CURRENTLY USED, to switch the OPCN3 CS line manually up and down
 # GPIO.setmode(GPIO.BCM)  # use the GPIO names (GPIO1...) instead of the processor pin name (BCM...)
-# CS = 25
+# CS = 25  # GPIO number in which CS is connected
 # GPIO.setup(CS, GPIO.OUT, initial=GPIO.HIGH)
 
 
@@ -152,7 +157,7 @@ def initiate_transmission(command_byte):
     while time.time() < stop:
         # logger.debug("attempts = " + str(attempts))  # disable to reduce the amount of time between spi.xfer
         reading = spi.xfer([command_byte])  # initiate control of power state
-        # spi.xfer() = write a byte AND READ AT THE SAME TIME
+        # spi.xfer() means write a byte AND READ AT THE SAME TIME
 
         if reading == [243]:  # SPI ready = 0xF3 = 243
             time.sleep(wait_10_micro)
@@ -163,8 +168,10 @@ def initiate_transmission(command_byte):
             attempts += 1
 
         elif reading == [230] or reading == [99] or reading == [0]:
-            # during developing, I noticed that those were the value read while having this kind of issue
-            # this comes from personal investigation and not from the official documentation
+            # During developing, I noticed that these were the answers given by the sensor when the CS line was
+            # facing troubles.
+            # This comes from personal experiment and not from the official documentation
+            # To resolve it, try connecting the CS line directly to the ground (current setting)
             logger.critical("Problem with the SS (Slave Select) line "
                             "(error code " + str(hex(reading[0])) + "), skipping")
             cycle += 1
@@ -184,7 +191,7 @@ def initiate_transmission(command_byte):
 
         if attempts > 60:
             # it is recommended to use > 20 in the Alphasense documentation
-            # 60 seems to be a good value
+            # After experiment it seems that 60 is a good value
             # (does not take too much time, and let some chance to the sensor to answer READY)
             logger.error("Failed 60 times to initiate control of power state, reset OPC-N3 SPI buffer, trying again")
             # cs_high()
@@ -219,6 +226,8 @@ def fan_off():
             reading = spi.xfer([0x02])
             # cs_high()
             # spi.close()  # close the serial port to let it available for another device
+            # Avoid opening and closing ports too ofter.
+            # Avoid getting "too much files opened" error after long running time
             if reading == [0x03]:  # official answer of the OPC-N3
                 print("Fan is OFF                ")
                 time.sleep(0.5)  # avoid too close communication (AND let some time to the OPC-N3 to stop the fan)
@@ -262,7 +271,9 @@ def fan_on():
             logger.debug("attempts = " + str(attempts))
             reading = spi.xfer([0x03])
             # cs_high()
-            # spi.close()
+            # spi.close()  # close the serial port to let it available for another device
+            # Avoid opening and closing ports too ofter.
+            # Avoid getting "too much files opened" error after long running time
             time.sleep(0.6)  # wait > 600 ms to let the fan start
             if reading == [0x03]:  # official answer of the OPC-N3
                 print("Fan is ON               ")
@@ -306,7 +317,9 @@ def laser_on():
         if initiate_transmission(0x03):
             reading = spi.xfer([0x07])
             # cs_high()
-            # spi.close()
+            # spi.close()  # close the serial port to let it available for another device
+            # Avoid opening and closing ports too ofter.
+            # Avoid getting "too much files opened" error after long running time
             if reading == [0x03]:
                 print("Laser is ON           ")
                 time.sleep(1)  # avoid too close communication
@@ -349,7 +362,9 @@ def laser_off():
         if initiate_transmission(0x03):
             reading = spi.xfer([0x06])
             # cs_high()
-            # spi.close()
+            # spi.close()  # close the serial port to let it available for another device
+            # Avoid opening and closing ports too ofter.
+            # Avoid getting "too much files opened" error after long running time
             if reading == [0x03]:
                 print("Laser is OFF                    ")
                 time.sleep(1)  # avoid too close communication
@@ -388,7 +403,9 @@ def read_DAC_power_status(item='all'):
     if initiate_transmission(0x13):
         response = spi.xfer([0x13, 0x13, 0x13, 0x13, 0x13, 0x13])
         # cs_high()
-        # spi.close()
+        # spi.close()  # close the serial port to let it available for another device
+        # Avoid opening and closing ports too ofter.
+        # Avoid getting "too much files opened" error after long running time
         time.sleep(0.5)  # avoid too close communication
 
         if item == 'fan':
@@ -495,11 +512,13 @@ def loading_bar(name, delay):
 
 def PM_reading():
     """
-    Read the PM bytes from the OPC-N3 sensor
+    (BETTER TO USE OPCN3.read_histogram())
+    Read the PM bytes only from the OPC-N3 sensor
     Read the data and convert them in readable format, checksum enabled
     Does neither start the fan nor start the laser
     :return: List[PM 1, PM2.5, PM10]
     """
+    print("YOU SHOULD BETTER USE OPCN3.read_histogram()")
     attempts = 1
     while attempts < 4:
         if initiate_transmission(0x32):
@@ -530,11 +549,13 @@ def PM_reading():
 
 def getPM(flushing, sampling_time):
     """
+    (BETTER TO USE OPCN3.read_histogram())
     Get PM measurement from OPC-N3
     :param flushing: time (seconds) during which the fan runs alone to flush the sensor with fresh air
     :param sampling_time: time (seconds) during which the laser reads the particulate matter in the air
     :return: List[PM1, PM2.5, PM10]
     """
+    print("YOU SHOULD BETTER USE OPCN3.read_histogram()")
     try:
         fan_on()
         time.sleep(flushing)
@@ -554,13 +575,19 @@ def getPM(flushing, sampling_time):
 
 def read_histogram(sampling_period):
     """
-    Read all the data of the OPC-N3
-    :param: flush: time (seconds) during while the fan is running
-    :return: Dictionary["PM 1", "PM 2.5", "PM 10", "temperature", "relative humidity", "bin", "MToF", "sampling time",
+    Read all the available data of the OPC-N3
+    It first read the histogram to delete the old data remaining in the OPCN3 buffer
+    Then it let the sensor take sample during the defined sampling period
+    Finally it read a last time the histogram data returned by the sensor
+    It decode the bytes returned into readable format
+    It returns everything in a dictionary
+    :param: sampling_period: amount of time time (seconds) during while the fan is running
+    :return: Dictionary{"PM 1", "PM 2.5", "PM 10", "temperature", "relative humidity", "bin", "MToF", "sampling time",
                   "sample flow rate", "reject count glitch", "reject count longTOF", "reject count ratio",
-                  "reject count out of range", "fan revolution count", "laser status"]
+                  "reject count out of range", "fan revolution count", "laser status"}
     """
     logger.debug("Reading histogram...")
+    print("Reading histogram...", end='\r')
 
     # Create a dictionary containing data to be returned in case of error
     to_return = {
@@ -620,17 +647,25 @@ def read_histogram(sampling_period):
     delay = sampling_period * 2  # you must wait two times the sampling_period in order that
     # the sampling time given by the OPC-N3 respects your sampling time wishes
     # first 5 seconds are with low gain, and the next seconds are with high gain (automatically performed by OPC-N3)
+    print("                                             ", end='\r')  # remove last line
 
+    # Reading the histogram delete all the data in the OPCN3's buffer
+    # If the checksum is wrong, seacanairy don't get the data as expected
+    # Nevertheless, OPCN3 clean its buffer and all data are lost
+    # So you must wait another x seconds to get sample
     if not take_new_sample_if_checksum_is_wrong:
         loading_bar('Sampling PM', delay)
 
     attempts = 1  # reset the counter for next measurement
     while attempts < 4:
+        # If the user want to take a nex sample in case the checksum is wrong (see explanation above), then
+        # the system must wait the required amount of time in the reading loop
         if take_new_sample_if_checksum_is_wrong:
             loading_bar('Sampling PM', delay)
 
         if initiate_transmission(0x30):
             # read all the bytes and store them in a dedicated variable
+            # see sensor documentation for more info
             bin = spi.xfer([0x00] * 48)
             MToF = spi.xfer([0x00] * 4)
             sampling_time = spi.xfer([0x00] * 2)
@@ -650,6 +685,7 @@ def read_histogram(sampling_period):
             # spi.close()
 
             # check that the data transmitted are correct by comparing the checksums
+            # if the checksum is correct, then proceed...
             if check(checksum, bin, MToF, sampling_time, sample_flow_rate, temperature, relative_humidity,
                      PM_A, PM_B,
                      PM_C, reject_count_glitch, reject_count_longTOF, reject_count_ratio, reject_count_Out_Of_Range,
@@ -657,10 +693,12 @@ def read_histogram(sampling_period):
                 logger.debug("SPI reading is:\r" + str(bin) + " " + str(MToF) + " " + str(sampling_time)
                              + " " + str(sample_flow_rate) + " " + str(temperature) + " " + str(relative_humidity)
                              + " " + str(PM_A) + " " + str(PM_B) + " " + str(PM_C) + " " + str(reject_count_glitch)
-                                         + " " + str(reject_count_longTOF) + " " + str(reject_count_ratio) + " "
-                                         + str(reject_count_Out_Of_Range) + " " + str(fan_rev_count)
-                                         + " " + str(laser_status))
+                             + " " + str(reject_count_longTOF) + " " + str(reject_count_ratio) + " "
+                             + str(reject_count_Out_Of_Range) + " " + str(fan_rev_count)
+                             + " " + str(laser_status))
                 # return TRUE if the data are correct, and execute the below
+
+                # decode the bytes according to the IEEE 754 32 bytes floating point format into decimals
                 # rounding until 2 decimals, as this is the accuracy of the OPC-N3 for PM values
                 PM1 = round(struct.unpack('f', bytes(PM_A))[0], 2)
                 PM25 = round(struct.unpack('f', bytes(PM_B))[0], 2)
@@ -679,6 +717,7 @@ def read_histogram(sampling_period):
                 sample_flow_rate = join_bytes(sample_flow_rate) / 100
                 print(" Sampling flow rate:", sample_flow_rate, "ml/s |", round(sample_flow_rate * 60, 2), "mL/min |",
                       round(sample_flow_rate * 60 * 60 / 1000, 2), "L/h")
+                # This is the amount of air passing through the laser beam, not the total sampling flow rate!
 
                 reject_count_glitch = join_bytes(reject_count_glitch)
                 print(" Reject count glitch:", reject_count_glitch, end="\t\t|\t")
@@ -761,14 +800,15 @@ def read_histogram(sampling_period):
 
             else:
                 # if the function with the checksum return an error (FALSE)
-                logger.warning("Error in the data received (wrong checksum), reading histogram again... (" + str(attempts) + "/3)")
+                logger.warning(
+                    "Error in the data received (wrong checksum), reading histogram again... (" + str(attempts) + "/3)")
                 logger.warning("Data received were:\n" + str(bin) + str(MToF) + str(sampling_time) +
-                                str(sample_flow_rate) +  str(temperature) +
-                                str(relative_humidity)  + str(PM_A) +  str(PM_B) +
-                                str(PM_C) +  str(reject_count_glitch) +
-                                str(reject_count_longTOF) +  str(reject_count_ratio) +
-                                str(reject_count_Out_Of_Range) +  str(fan_rev_count) +
-                                str(laser_status) +  str(checksum))
+                               str(sample_flow_rate) + str(temperature) +
+                               str(relative_humidity) + str(PM_A) + str(PM_B) +
+                               str(PM_C) + str(reject_count_glitch) +
+                               str(reject_count_longTOF) + str(reject_count_ratio) +
+                               str(reject_count_Out_Of_Range) + str(fan_rev_count) +
+                               str(laser_status) + str(checksum))
                 print("Waiting SPI Buffer reset", end='\r')
                 time.sleep(wait_reset_SPI_buffer)  # let some times between two SPI communications
                 attempts += 1
@@ -793,12 +833,16 @@ def read_histogram(sampling_period):
 def getdata(flushing_time, sampling_time):
     """
     Get all the possible data from the OPC-N3 sensor
-    :param flushing_time: time during which the ventilator is running, without laser, no sampling
+    Start the fan, start the laser, get the data, turn off the laser and the fan
+    :param flushing_time: time during which the ventilator is running without sampling
+                            to refresh the air inside the casing
     :param sampling_time: time during which the sensor is sampling
-    :return: List[PM1, PM25, PM10, temperature, relative_humidity]
+    :return: Dictionary{"PM 1", "PM 2.5", "PM 10", "temperature", "relative humidity", "bin", "MToF", "sampling time",
+                  "sample flow rate", "reject count glitch", "reject count longTOF", "reject count ratio",
+                  "reject count out of range", "fan revolution count", "laser status"}
     """
-    # return "error" everywhere in case of error during the measurement
-    # seacanairy.py need that the dictionary is full of items, if not, python instance will stop
+    # return "error" everywhere in case of error during the measurement (fan_on/laser_on/read_histogram...)
+    # seacanairy.py need to find the items in the dictionary, if not if crash
     to_return = {
         "PM 1": "error",
         "PM 2.5": "error",
@@ -845,10 +889,10 @@ def getdata(flushing_time, sampling_time):
     try:  # necessary to put an except condition (see below)
         if fan_on():
             print("Flushing fresh air", end='\r')
-            time.sleep(flushing_time/2)
+            time.sleep(flushing_time / 2)
             if laser_on():
                 print("Flushing fresh air", end='\r')
-                time.sleep(flushing_time/2)
+                time.sleep(flushing_time / 2)
                 to_return = read_histogram(sampling_time)
             else:
                 logger.critical("Skipping histogram reading")
@@ -859,7 +903,8 @@ def getdata(flushing_time, sampling_time):
         # spi.close()
         return to_return
 
-    except(KeyboardInterrupt, SystemExit):  # in case of error AND if user stop the software
+    except(KeyboardInterrupt, SystemExit):  # in case of error AND if user stop the software during sampling
+        # Avoid that the laser and the fan keep running indefinitely if system crash
         print("  ")  # go to the next line
         logger.info("Python instance has been stopped, shutting laser and fan OFF...")
         laser_off()
@@ -869,9 +914,9 @@ def getdata(flushing_time, sampling_time):
 
 def join_bytes(list_of_bytes):
     """
-    Join bytes into an integer, from byte 0 to byte infinite (right to left)
-    :param list_of_bytes:list of bytes coming from the spi.readbytes or spi.xfer function
-    :return:integer concatenated
+    Join bytes to an integer, from byte 0 to byte infinite (right to left)
+    :param list_of_bytes: list [bytes coming from the spi.readbytes or spi.xfer function]
+    :return: integer concatenated
     """
     val = 0
     for i in reversed(list_of_bytes):
@@ -881,8 +926,9 @@ def join_bytes(list_of_bytes):
 
 def set_fan_speed(speed):
     """
-    Define the speed of the build in sensor fan
-    The goal is to avoid dust formation in the sensor due to high polluted air
+    Define the speed of the builtin sensor fan
+    Define yourself the fan speed to reduce as much as possible dust deposition in the casing
+    Argument in percent, calibrated from the slowest as possible to the fastest
     :param speed: number between 0 and 100 (0 = slowest, 100 = fastest)
     :return: nothing
     """
@@ -916,6 +962,6 @@ if __name__ == '__main__':
         # print("sleep")
         # time.sleep(3)
 
-        getdata(2,3)
+        getdata(2, 3)
         print("sleep")
         time.sleep(5)

@@ -33,7 +33,7 @@ Use a SPI interface (spidev)
 * [Supplemental SPI information (072-0503)](https://ivobruggeoffice-my.sharepoint.com/:b:/g/personal/cyril_dewez_365_academicoffice_be/EZ0sC9YRnJtDk1bBb0wdnWEBJRDpJhDoEhiawHT7dnBjEA?e=U0VCsF)
 ### U-BLOX-7 GNSS module
 Use the UART interface (pyserial) 
-* [Velleman GPS Board](https://www.velleman.eu/products/view?id=439218&country=us&lang=fr)
+* [Velleman GPS Board VMA430](https://www.velleman.eu/products/view?id=439218&country=us&lang=fr)
 * [Datasheet](https://www.u-blox.com/sites/default/files/products/documents/NEO-6_DataSheet_(GPS.G6-HW-09005).pdf)
 * [Receiver description, including protocol specifications](https://www.u-blox.com/en/ubx-viewer/view/u-blox7-V14_ReceiverDescriptionProtocolSpec_(GPS.G7-SW-12001)_Public?url=https%3A%2F%2Fwww.u-blox.com%2Fsites%2Fdefault%2Ffiles%2Fproducts%2Fdocuments%2Fu-blox7-V14_ReceiverDescriptionProtocolSpec_%2528GPS.G7-SW-12001%2529_Public.pdf)
 # About me

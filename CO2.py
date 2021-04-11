@@ -1,6 +1,6 @@
 #! /home/pi/seacanairy_project/venv/bin/python3
 """
-Libraries for the use of E+E Elektronik EE894 CO2 sensor via I²C communication
+Library for the use of E+E Elektronik EE894 CO2 sensor via I²C communication
 """
 # --------------------------------------------------------
 # USEFUL VARIABLES
@@ -18,6 +18,8 @@ import os
 
 # smbus2 is the new smbus, allow more than 32 bits writing/reading
 from smbus2 import SMBus, i2c_msg
+# 'SMBus' is the general driver for i2c communication
+# 'i2c_msg' allow to make i2c write followed by i2c read WITHOUT any STOP byte (see sensor documentation)
 
 # logging
 import logging
@@ -27,9 +29,6 @@ import yaml
 
 # progress bar during sampling
 from progress.bar import IncrementalBar
-
-# 'SMBus' is the general driver for i2c communication
-# 'i2c_msg' allow to make i2c write followed by i2c read WITHOUT any STOP byte (see sensor documentation)
 
 # I²C address of the CO2 device
 CO2_address = 0x33  # i2c address by default, can be changed (see sensor doc)
@@ -45,7 +44,7 @@ current_working_directory = str(os.getcwd())
 
 with open(current_working_directory + '/seacanairy_settings.yaml') as file:
     settings = yaml.safe_load(file)
-    file.close()
+    file.close()  # close the file after use
 
 store_debug_messages = settings['CO2 sensor']['Store debug messages (important increase of logs)']
 
@@ -88,7 +87,7 @@ if __name__ == '__main__':  # if you run this code directly ($ python3 CO2.py)
     # Without the 'if __name__ == '__main__' condition, all the logging messages are displayed 3 TIMES
     # (once for the handler in CO2.py, once for the handler in OPCN3.py, and once for the handler in seacanairy.py)
 
-    # define a Handler which writes INFO messages or higher to the sys.stderr/display
+    # define a Handler which writes INFO messages or higher to the sys.stderr/display (= the console)
     console = logging.StreamHandler()
     console.setLevel(message_level)
     # set a format which is simpler for console use
@@ -99,12 +98,13 @@ if __name__ == '__main__':  # if you run this code directly ($ python3 CO2.py)
     logging.getLogger().addHandler(console)
 
 else:  # if this file is considered as a library (if you execute seacanairy.py for example)
-    # it will only print and store INFO messages in the corresponding log_file
+    # if the user asked to store all the messages in 'seacanairy_settings.yaml'
     if store_debug_messages:
         message_level = logging.DEBUG
+    # if the user don't want to store everything
     else:
         message_level = logging.INFO
-    # Create a file to store the log if it doesn't exist
+    # Create a file to store the log if it doesn't exist yet
     log_file = current_working_directory + "/" + project_name + "/" + project_name + "-log.log"
     logger = set_logger(message_level, log_file)
     # no need to add a handler, because there is already one in seacanairy.py
@@ -118,9 +118,10 @@ else:  # if this file is considered as a library (if you execute seacanairy.py f
 
 def loading_bar(name, delay):
     """
-    Show a loading bar on the screen during sampling for example
+    Show a loading bar on the screen during a a certain amount of time
+    Make the user understand the software is doing/waiting for something
     :param name: Text to be shown on the left of the loading bar
-    :param length: Number of increments necessary for the bar to be full
+    :param length: Amount of time the system is waiting in seconds
     :return: nothing
     """
     bar = IncrementalBar(name, max=(2 * delay), suffix='%(elapsed)s/' + str(delay) + ' seconds')
@@ -162,9 +163,9 @@ def digest(buf):
 def check(checksum, data):
     """
     Check that the data transmitted are correct using the data and the given checksum
+    :param checksum: Checksum given by the sensor (see sensor doc)
     :param data: List[bytes to be used in the checksum calculation (see sensor doc)]
-    :param checksum: Checksum given by the sensor
-    :return:
+    :return: True if the data are correct, False if not
     """
     calculation = digest(data)
     if calculation == checksum:
@@ -178,43 +179,14 @@ def check(checksum, data):
         if data[0] and data[1] == 0:
             logger.debug("Sensor returned 0 values, it is not ready, waiting a bit")
             print("Sensor not ready, waiting...", end='\r')
-            time.sleep(4)
+            time.sleep(3)
         return False
-
-
-def request_measurement():
-    """
-    Request a new measurement to the sensor if the previous one is older than 10 seconds.
-    Reset the internal counter (after the execution of this function, the sensor will wait for the amount of time
-    defined as the internal timestamp before taking the next measurement)
-    :return:  status given by the sensor
-    """
-
-    # In the settings of the sensor, the firmware automatically make measurement every x seconds
-    # Sending this STATUS will request a new measurement IF the previous one is older than 10 seconds
-    print('Requesting a new measurement on the CO2 sensor')
-
-    try:
-        status = bus.read_byte_data(CO2_address, 0x71)
-        logger.debug("Reading status on the CO2 sensor")
-
-        if (status != 0):
-            logger.debug("CO2 sensor status is not ok. Value read is " + str(status))
-
-        return status
-
-    except:
-        logger.error("I²C error while reading status of CO2 sensor")
-        return 255  # indicate that all the bytes are 1 (0b11111111)
 
 
 def getRHT():
     """
-    Read temperature and relative humidity from the CO2 sensor.
-        CO2_get_RH_T()[0] = relative humidity
-        CO2_get_RH_T()[1] = temperature
-
-    :return:  Dictionary("RH", "temperature")
+    Get the last Temperature and Relative Humidity taken by the CO2 sensor
+    :return:  Dictionary{"RH", "temperature"}
     """
     logger.debug("Reading RH and Temperature from CO2 sensor")
 
@@ -224,7 +196,7 @@ def getRHT():
     attempts = 0  # trial counter for the checksum and the validity of the data received
     reading_trials = 0  # trial counter for the i2c communication
 
-    # In case there is a problem and it return nothing, return "error", which can be understood as an error
+    # In case there is a problem and it return nothing, return "error"
     data = {
         "relative humidity": "error",
         "temperature": "error"
@@ -248,7 +220,7 @@ def getRHT():
                 logger.error("Error in the i2c transmission (" + str(sys.exc_info())
                              + "), trying again... (" + str(reading_trials + 1) + "/" + str(max_attempts) + ")")
                 reading_trials += 1  # increment of reading_trials
-                time.sleep(4)  # if transmission fails, wait a bit to try again (sensor is maybe busy)
+                time.sleep(3)  # if transmission fails, wait a bit to try again (sensor is maybe busy)
 
         # process the data given by the sensor
         reading = list(read)
@@ -284,12 +256,9 @@ def getRHT():
 
 def getCO2P():
     """
-    Read the CO2 and pressure from the CO2 sensor.
-        CO2_get_CO2_P()[0] = CO2_average
-        CO2_get_CO2_P()[1] = CO2_raw
-        CO2_get_CO2_P()[2] = pressure
+    Get the last CO2 instant and pressure reading of the CO2 sensor, and get the CO2 average
 
-    :return: Dictionary["average", "instant", "pressure")
+    :return: Dictionary{"average", "instant", "pressure"}
     """
     logger.debug('Reading of CO2 and pressure')
 
@@ -325,7 +294,7 @@ def getCO2P():
                              str(reading_trials + 1) + "/" + str(max_attempts) + ")")
                 reading_trials += 1  # increment of reading_trials
                 print("Waiting 4 seconds...", end='\r')
-                time.sleep(4)  # if I²C comm fails, wait a little bit and try again (sensor is maybe busy)
+                time.sleep(3)  # if I²C comm fails, wait a little bit and try again (sensor is maybe busy)
 
         # process the data given by the sensor
         reading = list(read)
@@ -358,13 +327,13 @@ def getCO2P():
                 attempts += 1
                 logger.warning("Error in the data received (wrong checksum), reading data again... (" +
                                str(attempts) + "/" + str(max_attempts) + ")")
-                time.sleep(4)  # avoid too close i2c communication
+                time.sleep(3)  # avoid too close i2c communication
 
 
 def get_data():
     """
-    Read all the data from the CO2 sensor
-    :return: Dictionary("pressure", "temperature", "CO2 average", "CO2 instant")
+    Read all the data available from the CO2 sensor
+    :return: Dictionary{"pressure", "temperature", "CO2 average", "CO2 instant"}
     """
     # Get CO2 and pressure
     data1 = getCO2P()
@@ -383,7 +352,7 @@ def internal_timestamp(new_timestamp=None):
     """
     Read the internal sampling period of the CO2 sensor
     To change the value, write it between the brackets (in seconds)
-    :param new_timestamp: None to read, new value in seconds to change it
+    :param new_timestamp: Nothing to read, new value in seconds to change it
     :return: internal sampling period of the sensor
     """
     if new_timestamp is not None:  # if user write something as input in the brackets (arguments)
@@ -412,7 +381,7 @@ def internal_timestamp(new_timestamp=None):
 def status(print_information=True):
     """
     Read the status byte of the CO2 sensor
-    !! Will trigger a new measurement if the previous one is older than 10 seconds
+    !! It will trigger a new measurement if the previous one is older than 10 seconds
     :param: print_information: Optional: False to hide the messages
     :return: List[CO2 status, temperature status, humidity status]
     """
@@ -448,20 +417,23 @@ def trigger_measurement(force=False):
     """
     Ask the CO2 sensor to start a new measurement now if the previous one is older than 10 seconds
     Same function as 'status()'
-    :param: wait_for_available_measurement: True to let time to the sensor to take the measurement
+    :param: force:  True to apply the function two consecutive time to be sure that the sensor is well
+                    synchronized with the seacanairy
+                    False to apply it once (during the main loop of the Seacanairy for example
     :return: Status of the sensor: List[CO2 status, temperature status, humidity status]
     """
     print("Triggering a new measurement...", end='\r')
 
-    # The sensor will not take a new sample as long as the previous one is not older than 10 seconds
+    # The sensor will not take a new sample if the previous one is older than 10 seconds
     sensor_status = status(False)  # trigger new measurement
 
     if measurement_delay != 0:  # if user/software want to wait for the data to be ready
-        loading_bar("Waiting for sensor sampling", measurement_delay)
+        loading_bar("Waiting for sensor sampling", measurement_delay)  # usually 10 seconds (see doc)
         # sensor documentation, let time to the sensor to perform the measurement
 
-        if force:
-            sensor_status = status(False)  # That way, we ensure that the sensor will trigger a new measurement RIGHT now
+        if force:  # if force is True
+            # That way, we ensure that the sensor will trigger a new measurement RIGHT now
+            sensor_status = status(False)
             loading_bar("Waiting for sensor sampling", measurement_delay)
             # sensor documentation, let time to the sensor to perform the measurement
 
@@ -470,7 +442,7 @@ def trigger_measurement(force=False):
 
 def read_internal_calibration(item):
     """
-    Read the internal calibration of the sensor
+    Read the internal calibration of the sensor, indicate which calibration you want to read
     :param item: 'relative humidity', 'temperature', 'pressure', 'CO2', 'all'
     :return: List[offset, gain, lower_limit, upper_limit]
     """
@@ -530,14 +502,15 @@ def read_internal_calibration(item):
 
 def read_from_custom_memory(index, number_of_bytes):
     """
-    Read data from custom memory address in the CO2 sensor
+    Read data from specified custom memory address in the CO2 sensor
     :param index: index of the data to be read (see sensor doc)
     :param number_of_bytes: number of bytes to read (see sensor doc)
     :return: list[bytes] from right to left
     """
-    logger.debug("Reading " + str(number_of_bytes) + " bytes from customer memory at index " + str(hex(index)) + "...")
+    logger.info("Reading " + str(number_of_bytes) + " bytes from customer memory at index " + str(hex(index)) + "...")
     write = i2c_msg.write(CO2_address, [0x71, 0x54, index])  # usual bytes to send/write to initiate the reading
     attempts = 1
+    read = []  # avoid return issue
 
     while attempts < 4:
         try:
@@ -554,21 +527,22 @@ def read_from_custom_memory(index, number_of_bytes):
             else:
                 logger.error("i2c communication failed to read from customer memory (" + str(attempts) + "/3)")
                 attempts += 1
-                time.sleep(2)  # avoid too close i2c communication, let time to the sensor, may be busy
+                print("Waiting 3 seconds...", end='\r')
+                time.sleep(3)  # avoid too close i2c communication, let time to the sensor, may be busy
 
     reading = list(read)
-    logger.debug("Reading from custom memory returned " + str(reading))
+    logger.info("Reading from custom memory returned " + str(reading))
     return reading
 
 
 def write_to_custom_memory(index, *bytes_to_write):
     """
     Write data to a custom memory address in the CO2 sensor
-    :param index: index of the customer memory to write
-    :param bytes_to_write: infinite number of data to write at that place
+    :param index: index of the customer memory to write (see sensor doc)
+    :param bytes_to_write: unlimited amount of bytes to write
     :return: True (Success) or False (Fail)
     """
-    logger.debug("Writing " + str(bytes_to_write) + " inside custom memory at index " + str(hex(index)) + "...")
+    logger.info("Writing " + str(bytes_to_write) + " inside custom memory at index " + str(hex(index)) + "...")
     crc8 = digest([index, *bytes_to_write])  # calculation of the CRC8 based on the index number and all the bytes sent
     attempts = 1  # trial counter for writing into the customer memory
     cycle = 1  # trial counter for i2c communication
@@ -621,7 +595,7 @@ def write_to_custom_memory(index, *bytes_to_write):
 # in opposition with __name__ = '__CO2__' when the Python sheet is executed as a library from another Python sheet
 
 # What is below will be executed if user execute this Python code directly ($ python3 CO2.py)
-# Code below is used to make trials to the CO2 sensor while developping
+# Code below is used to make trials to the CO2 sensor while developing
 
 if __name__ == '__main__':
     now = datetime.now()
@@ -633,7 +607,6 @@ if __name__ == '__main__':
 
     while True:  # unstopped loop
         getRHT()
-        time.sleep(1)
         getCO2P()
-        print("waiting...")
+        print("waiting 10 seconds...")
         time.sleep(10)  # wait 10 seconds
