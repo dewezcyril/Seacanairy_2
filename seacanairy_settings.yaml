@@ -3,9 +3,10 @@
 
 Seacanairy settings:
   # Name of the folder in which the log and data files will be stored:
-  Sampling session name: "THE_FINAL" #.csv
+  Sampling session name: "dimanche_11_04" #.csv
   # Amount of time between each consecutive measurement
   Sampling period: 60  # seconds
+  Flushing time before measurement: 0  # seconds
 
 
 CO2 sensor:
@@ -32,3 +33,69 @@ OPC-N3 sensor:
 GPS:
   Activate this sensor: Yes
   Store debug messages (important increase of logs): No
+
+
+AFE Board:
+  Activate this sensor: Yes
+  Store debug messages (important increase of logs): No
+  Calibration:
+    # Calibration settings
+    NO2:
+      Calibration version number: 1
+      Calibration name: "Lukas"
+      Calibration date: "june 2020"
+      WE SENS: 0.292511  # mV/ppb
+      WE 0,e: 305.5  # mV
+      AE 0,e: 314,5  # mV
+      WE 0,s: -23,506  # mV
+      AE 0,s: -11,242  # mV
+      WE 0: 281,994  # mV
+      AE 0: 303,258  # mV
+
+    OX:
+      Calibration version number: 1
+      Calibration name: "Lukas"
+      Calibration date: "june 2020"
+      WE SENS: 0.3701465  # mV/ppb
+      WE SENS NO2: 0,42175  # mV/ppb
+      WE 0,e: 366.5  # mV
+      AE 0,e: 414  # mV
+      WE 0,s: -49.939  # mV
+      AE 0,s: -8,519  # mV
+      WE 0: 316.561  # mV
+      AE 0: 405.481  # mV
+
+    SO2:
+      Calibration version information:
+        Version number: 1
+        Calibration name: "Lukas"
+        Calibration date: "june 2020"
+      WE SENS: 0.29688  # mV/ppb
+      WE 0,e: 315  # mV
+      AE 0,e: 289.5  # mV
+      WE 0,s: -12.64  # mV
+      AE 0,s: 7.28  # mV
+      WE 0: 327.64  # mV
+      AE 0: 296.78  # mV
+
+    CO:
+      Calibration version information:
+        Version number: 1
+        Calibration name: "Lukas"
+        Calibration date: "june 2020"
+      WE SENS: 0.2776  # mV/ppb
+      WE 0,e: 305.5  # mV
+      AE 0,e: 301  # mV
+      WE 0,s: -28.24  # mV
+      AE 0,s: 25.76  #mV
+      WE 0: 277.26  # mV
+      AE 0: 326.76  #mV
+
+    Temperature:
+      Calibration version information:
+        Version number: 1
+        Calibration name: "Lukas"
+        Calibration date: "june 2020"
+      Thermal sensitivity: 1  # mV/°C
+      Vkal: 314  # mV/°C
+      Tkal: 18  # °C

@@ -339,7 +339,7 @@ def getCO2P():
             print("CO2 average is:", CO2_average, "ppm", end="")
 
             CO2_raw = (reading[3] << 8) + reading[4]
-            print("\t\t| CO2 instant is:", CO2_raw, "ppm")
+            print("\t| CO2 instant is:", CO2_raw, "ppm")
 
             data = {
                 "average": CO2_average,
@@ -416,36 +416,42 @@ def status(print_information=True):
     :param: print_information: Optional: False to hide the messages
     :return: List[CO2 status, temperature status, humidity status]
     """
-    with SMBus(1) as bus:
-        reading = bus.read_byte_data(CO2_address, 0x71)
-    # see documentation for the following decryption
-    CO2_status = reading & 0b00001000
-    temperature_status = reading & 0b00000010
-    humidity_status = reading & 0b00000001
-    if print_information:  # if user/software indicate to print the information
-        if CO2_status == 0:
-            logger.info("CO2 measurement is OK")
-        else:
-            logger.warning("CO2 measurement is NOK")
-        if temperature_status == 0:
-            logger.info("Temperature measurement is OK")
-        else:
-            logger.warning("Temperature measurement is NOK")
-        if humidity_status == 0:
-            logger.info("Humidity measurement is OK")
-        else:
-            logger.warning("Humidity measurement is NOK")
+    try:
+        with SMBus(1) as bus:
+            reading = bus.read_byte_data(CO2_address, 0x71)
+        # see documentation for the following decryption
+        CO2_status = reading & 0b00001000
+        temperature_status = reading & 0b00000010
+        humidity_status = reading & 0b00000001
+        if print_information:  # if user/software indicate to print the information
+            if CO2_status == 0:
+                logger.info("CO2 measurement is OK")
+            else:
+                logger.warning("CO2 measurement is NOK")
+            if temperature_status == 0:
+                logger.info("Temperature measurement is OK")
+            else:
+                logger.warning("Temperature measurement is NOK")
+            if humidity_status == 0:
+                logger.info("Humidity measurement is OK")
+            else:
+                logger.warning("Humidity measurement is NOK")
+    except:
+        logger.critical("Failed to read sensor status")
+        CO2_status = 1
+        temperature_status = 1
+        humidity_status = 1
     return [CO2_status, temperature_status, humidity_status]
 
 
-def trigger_measurement():
+def trigger_measurement(force=False):
     """
     Ask the CO2 sensor to start a new measurement now if the previous one is older than 10 seconds
     Same function as 'status()'
     :param: wait_for_available_measurement: True to let time to the sensor to take the measurement
     :return: Status of the sensor: List[CO2 status, temperature status, humidity status]
     """
-    logger.info("Triggering a new measurement...")
+    print("Triggering a new measurement...", end='\r')
 
     # The sensor will not take a new sample as long as the previous one is not older than 10 seconds
     sensor_status = status(False)  # trigger new measurement
@@ -454,10 +460,11 @@ def trigger_measurement():
         loading_bar("Waiting for sensor sampling", measurement_delay)
         # sensor documentation, let time to the sensor to perform the measurement
 
-        sensor_status = status(False)  # That way, we ensure that the sensor will trigger a new measurement RIGHT now
+        if force:
+            sensor_status = status(False)  # That way, we ensure that the sensor will trigger a new measurement RIGHT now
+            loading_bar("Waiting for sensor sampling", measurement_delay)
+            # sensor documentation, let time to the sensor to perform the measurement
 
-        loading_bar("Waiting for sensor sampling", measurement_delay)
-        # sensor documentation, let time to the sensor to perform the measurement
     return sensor_status  # same function as 'status()', but here we don't want to print the status on the screen
 
 

@@ -13,6 +13,7 @@ import os.path
 import os
 import yaml
 import logging
+import RPi.GPIO as GPIO
 
 # ---------------------------------------
 # SETTINGS
@@ -53,6 +54,10 @@ OPC_fan_speed = settings['OPC-N3 sensor']['Fan speed']
 CO2_activation = settings['CO2 sensor']['Activate this sensor']
 OPCN3_activation = settings['OPC-N3 sensor']['Activate this sensor']
 GPS_activation = settings['GPS']['Activate this sensor']
+AFE_activation = settings['AFE Board']['Activate this sensor']
+
+# Pump settings
+fresh_air_piping_flushing_time = settings['Seacanairy settings']['Flushing time before measurement']
 
 # -----------------------------------------
 # CREATE FILES
@@ -85,6 +90,9 @@ if OPCN3_activation:
 if GPS_activation:
     import GPS  # Library for the GPS
 
+if AFE_activation:
+    import AFE
+
 # -----------------------------------------
 # LOGGING
 # -----------------------------------------
@@ -110,10 +118,43 @@ logging.getLogger().addHandler(console)
 
 logger = logging.getLogger('SEACANAIRY')
 
+# -----------------------------------------
+# FUNCTIONS
+# -----------------------------------------
+
+GPIO.setmode(GPIO.BCM)  # use the GPIO names (GPIO1...) instead of the processor pin name (BCM...)
+pump_gpio = 27
+GPIO.setup(pump_gpio, GPIO.OUT, initial=GPIO.LOW)
 
 # -----------------------------------------
 # FUNCTIONS
 # -----------------------------------------
+
+
+def loading_bar(name, delay):
+    """
+    Show a loading bar on the screen during sampling for example
+    :param name: Text to be shown on the left of the loading bar
+    :param length: Number of increments necessary for the bar to be full
+    :return: nothing
+    """
+    bar = IncrementalBar(name, max=(2 * delay), suffix='%(elapsed)s/' + str(delay) + ' seconds')
+    for i in range(2 * delay):
+        time.sleep(0.5)
+        bar.next()
+    bar.finish()
+    return
+
+
+def pump_start():
+    GPIO.output(pump_gpio, GPIO.HIGH)
+    print("Air pump is on")
+
+
+def pump_stop():
+    GPIO.output(pump_gpio, GPIO.LOW)
+    print("Air pump is off")
+
 
 def append_data_to_csv(*data_to_write):
     """
@@ -186,6 +227,11 @@ if not os.path.isfile(csv_file):  # if the file doesn't exist
                        "bin 1 MToF", "bin 3 MToF", "bin 5 MToF", "bin 7 MToF",
                        "reject count glitch", "reject count long TOF", "reject count ratio",
                        "reject count out of range", "fan revolution count", "laser status",
+                       "temperature (°C)", "temperature (mV)",
+                       "NO2 (ppm)", "NO2 main (mV)", "NO2 aux (mV)",
+                       "OX (ppm)", "OX main (mV)", "OX aux (mV)",
+                       "SO2 (ppm)", "SO2 main (mV)", "SO2 aux (mV)",
+                       "CO2 (ppm)", "CO2 main (mV)", "CO2 aux (mV)",
                        "Date and time (UTC)",
                        "GPS fix date and time (UTC)", "latitude", "longitude", "SOG (kts)", "COG",
                        "horizontal dilution of precision", "accuracy",
@@ -243,12 +289,18 @@ while True:
     # a bit the same as 'millis()' on Arduino
     # easier to work with than with a complex datetime format and a timedelta function...
 
+    pump_start()
+
+    if fresh_air_piping_flushing_time != 0:
+        loading_bar('Flushing fresh air in the piping system', fresh_air_piping_flushing_time)
+
     to_write = []  # create the list in which data to store will be saved
     # [a, b, c] + [d, e, f] = [a, b, c, d, e, f]
 
     if CO2_activation:
         # Get CO2 sensor data (see 'CO2.py')
         print("******************* CO2 SENSOR *******************")
+        CO2.trigger_measurement()
         CO2_data = CO2.get_data()
         to_write += [CO2_data["relative humidity"], CO2_data["temperature"], CO2_data["pressure"],
                      CO2_data["average"], CO2_data["instant"]]
@@ -273,9 +325,22 @@ while True:
                      OPC_data["reject count out of range"],
                      OPC_data["fan revolution count"], OPC_data["laser status"]]
 
+    if AFE_activation:
+        # Get OPC-N3 sensor data (see 'AFE.py')
+        print("****************** AFE BOARD ********************")
+        AFE_data = AFE.getdata()
+        to_write += [AFE_data["temperature"], AFE_data["temperature raw"],
+                     AFE_data["NO2 ppm"], AFE_data["NO2 main"], AFE_data["NO2 aux"],
+                     AFE_data["OX ppm"], AFE_data["OX main"], AFE_data["OX aux"],
+                     AFE_data["SO2 ppm"], AFE_data["SO2 main"], AFE_data["SO2 aux"],
+                     AFE_data["CO ppm"], AFE_data["CO main"], AFE_data["CO aux"]
+                     ]
+
+    pump_stop()
+
     if GPS_activation:
-        print("Wait switching from SPI to UART...", end='\r')
-        time.sleep(1)  # avoid too close communication between SPI of OPC and UART of GPS
+        # print("Wait switching from SPI to UART...", end='\r')
+        # time.sleep(1)  # avoid too close communication between SPI of OPC and UART of GPS
         # Get GPS information
         print("********************** GPS **********************")
         GPS_data = GPS.get_position()
