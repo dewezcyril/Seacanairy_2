@@ -205,7 +205,7 @@ def decode_NMEA(data):
             if check(data[i]):
                 GPGGA = data[i].split(",")
                 current_time = GPGGA[1][0:2] + ":" + GPGGA[1][2:4] + ":" + GPGGA[1][4:6] + " UTC"
-                altitude = GPGGA[9] + " " + GPGGA[10]
+                altitude = GPGGA[9] + " m"
                 WGS84_correction = GPGGA[11] + " " + GPGGA[12]
                 position_fix_status_indicator = GPGGA[6]
                 horizontal_precision = float(GPGGA[8])
