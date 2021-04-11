@@ -144,7 +144,7 @@ def getADCreading(adc_address, adc_channel):
 
     attempts = 0
 
-    print("Reading channel", str(adc_channel) + "...               ", end='\r')
+    print("Reading tension...               ", end='\r')
 
     while attempts < 4:
 
@@ -159,7 +159,7 @@ def getADCreading(adc_address, adc_channel):
 
             # ----------- End of conversion of the Channel ----------
             volts = valor * vref / max_reading
-            print("Reading channel", str(adc_channel) + "...", volts, "V", end='\r')
+            print("Reading tension...", volts, "V", end='\r')
 
             if (reading[0] & 0b11000000) == 0b11000000:
                 logger.error(
