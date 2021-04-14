@@ -183,6 +183,43 @@ def check(checksum, data):
         return False
 
 
+def status(print_information=True):
+    """
+    Read the status byte of the CO2 sensor
+    !! It will trigger a new measurement if the previous one is older than 10 seconds
+    :param: print_information: Optional: False to hide the messages
+    :return: List[CO2 status, temperature status, humidity status]
+    """
+    logger.debug("Reading sensor status")
+    try:
+        with SMBus(1) as bus:
+            reading = bus.read_byte_data(CO2_address, 0x71)
+        # see documentation for the following decryption
+        CO2_status = reading & 0b00001000
+        temperature_status = reading & 0b00000010
+        humidity_status = reading & 0b00000001
+        if print_information:  # if user/software indicate to print the information
+            if CO2_status == 0:
+                logger.debug("CO2 status is OK")
+            else:
+                logger.warning("CO2 status is NOK")
+            if temperature_status == 0:
+                logger.debug("Temperature status is OK")
+            else:
+                logger.warning("Temperature is NOK")
+            if humidity_status == 0:
+                logger.debug("Humidity status is OK")
+            else:
+                logger.warning("Humidity status is NOK")
+        if CO2_status or humidity_status != 0:
+            return False
+        else:
+            return True
+    except:
+        logger.critical("Failed to read sensor status")
+        return True  # try to go ahead in all cases
+
+
 def getRHT():
     """
     Get the last Temperature and Relative Humidity taken by the CO2 sensor
@@ -335,6 +372,19 @@ def get_data():
     Read all the data available from the CO2 sensor
     :return: Dictionary{"pressure", "temperature", "CO2 average", "CO2 instant"}
     """
+    # Read status byte
+    attempts = 1
+    while True:
+        if status(True):
+            break
+        else:
+            print("Waiting for data to be ready...", end='\r')
+            time.sleep(2)
+            attempts += 1
+        if attempts >= 6:
+            print("Sensor not ready, trying to read...", end='\r')
+            break
+
     # Get CO2 and pressure
     data1 = getCO2P()
     # Get RH and temperature
@@ -378,41 +428,6 @@ def internal_timestamp(new_timestamp=None):
         logger.error("Failed to change the internal timestamp to " + str(new_timestamp) + " seconds")
 
 
-def status(print_information=True):
-    """
-    Read the status byte of the CO2 sensor
-    !! It will trigger a new measurement if the previous one is older than 10 seconds
-    :param: print_information: Optional: False to hide the messages
-    :return: List[CO2 status, temperature status, humidity status]
-    """
-    try:
-        with SMBus(1) as bus:
-            reading = bus.read_byte_data(CO2_address, 0x71)
-        # see documentation for the following decryption
-        CO2_status = reading & 0b00001000
-        temperature_status = reading & 0b00000010
-        humidity_status = reading & 0b00000001
-        if print_information:  # if user/software indicate to print the information
-            if CO2_status == 0:
-                logger.info("CO2 measurement is OK")
-            else:
-                logger.warning("CO2 measurement is NOK")
-            if temperature_status == 0:
-                logger.info("Temperature measurement is OK")
-            else:
-                logger.warning("Temperature measurement is NOK")
-            if humidity_status == 0:
-                logger.info("Humidity measurement is OK")
-            else:
-                logger.warning("Humidity measurement is NOK")
-    except:
-        logger.critical("Failed to read sensor status")
-        CO2_status = 1
-        temperature_status = 1
-        humidity_status = 1
-    return [CO2_status, temperature_status, humidity_status]
-
-
 def trigger_measurement(force=False):
     """
     Ask the CO2 sensor to start a new measurement now if the previous one is older than 10 seconds
@@ -427,11 +442,12 @@ def trigger_measurement(force=False):
     # The sensor will not take a new sample if the previous one is older than 10 seconds
     sensor_status = status(False)  # trigger new measurement
 
-    if measurement_delay != 0:  # if user/software want to wait for the data to be ready
-        loading_bar("Waiting for sensor sampling", measurement_delay)  # usually 10 seconds (see doc)
-        # sensor documentation, let time to the sensor to perform the measurement
+    if force:  # if force is True
+        print("Synchronize sensor with Seacanairy sampling period")
+        if measurement_delay != 0:  # if user/software want to wait for the data to be ready
+            loading_bar("Waiting for sensor sampling", measurement_delay)  # usually 10 seconds (see doc)
+            # sensor documentation, let time to the sensor to perform the measurement
 
-        if force:  # if force is True
             # That way, we ensure that the sensor will trigger a new measurement RIGHT now
             sensor_status = status(False)
             loading_bar("Waiting for sensor sampling", measurement_delay)
@@ -604,9 +620,9 @@ if __name__ == '__main__':
 
     print("Reading internal timestamp")
     internal_timestamp()
+    trigger_measurement(force=True)
 
     while True:  # unstopped loop
-        getRHT()
-        getCO2P()
+        get_data()
         print("waiting 10 seconds...")
         time.sleep(10)  # wait 10 seconds

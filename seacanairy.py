@@ -31,7 +31,7 @@ sampling_period = settings['Seacanairy settings']['Sampling period']
 
 # CO2 sampling period (CO2 sensor takes samples automatically)
 CO2_sampling_period = int(sampling_period / settings['CO2 sensor']['Automatic sampling frequency ' \
-                                                                   '(number of sample during the above sampling period)'])
+                                                                   '(number of sample during the above sampling period)'] + 10)
 
 # Amount of time required for the CO2 sensor to take the measurement
 CO2_startup_delay = settings['CO2 sensor']['Amount of time required for the sensor to take the measurement']
@@ -292,7 +292,7 @@ if OPCN3_activation:
 
 if CO2_activation:
     # Ask the CO2 sensor to take a new sample
-    CO2.trigger_measurement()
+    CO2.trigger_measurement(True)
 
 # LOOP
 
@@ -315,13 +315,7 @@ while True:
     to_write = []  # create the list in which data to store will be saved
     # [a, b, c] + [d, e, f] = [a, b, c, d, e, f]
 
-    if CO2_activation:
-        # Get CO2 sensor data (see 'CO2.py')
-        print("******************* CO2 SENSOR *******************")
-        CO2.trigger_measurement()
-        CO2_data = CO2.get_data()
-        to_write += [CO2_data["relative humidity"], CO2_data["temperature"], CO2_data["pressure"],
-                     CO2_data["average"], CO2_data["instant"]]
+    CO2.trigger_measurement()
 
     if OPCN3_activation:
         # Get OPC-N3 sensor data (see 'OPCN3.py')
@@ -342,6 +336,13 @@ while True:
                      OPC_data["reject count long TOF"], OPC_data["reject count ratio"],
                      OPC_data["reject count out of range"],
                      OPC_data["fan revolution count"], OPC_data["laser status"]]
+
+    if CO2_activation:
+        # Get CO2 sensor data (see 'CO2.py')
+        print("******************* CO2 SENSOR *******************")
+        CO2_data = CO2.get_data()
+        to_write += [CO2_data["relative humidity"], CO2_data["temperature"], CO2_data["pressure"],
+                     CO2_data["average"], CO2_data["instant"]]
 
     if AFE_activation:
         # Get OPC-N3 sensor data (see 'AFE.py')
