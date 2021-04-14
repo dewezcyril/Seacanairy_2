@@ -315,10 +315,14 @@ def get_position():
             logger.critical("Unable to read GPS data, skipping reading")
             return to_return  # return a dictionary full of "error"
         else:
-            data = decode_NMEA(reading)  # decode the raw reading
-            to_return.update(data)  # update the dictionary with the data the function got
-            logger.debug("'to_return' is:\r" + str(to_return))
-            # At each trial, it will update the dictionary
+            try:  # avoid errors because of 'I don't know why the sensor sometimes delete items in the NMEA at random'
+                data = decode_NMEA(reading)  # decode the raw reading
+                to_return.update(data)  # update the dictionary with the data the function got
+                logger.debug("'to_return' is:\r" + str(to_return))
+                # At each trial, it will update the dictionary
+            except:
+                logger.error("There were an error while decoding NMEA protocol (" + str(str(sys.exc_info())) + ")")
+
             if "error" in to_return.values():  # if the dictionary contains an error, try again
                 attempts += 1
                 if attempts >= 4:  # if the system has tried 3 times to read the data but that there are still errors

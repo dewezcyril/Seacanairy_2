@@ -230,7 +230,7 @@ def fan_off():
             # Avoid getting "too much files opened" error after long running time
             if reading == [0x03]:  # official answer of the OPC-N3
                 print("Fan is OFF                ")
-                time.sleep(0.5)  # avoid too close communication (AND let some time to the OPC-N3 to stop the fan)
+                # time.sleep(0.5)  # avoid too close communication (AND let some time to the OPC-N3 to stop the fan)
                 return False
             else:
                 time.sleep(1)  # let some time to the OPC-N3 (to try to stop the fan)
@@ -322,7 +322,7 @@ def laser_on():
             # Avoid getting "too much files opened" error after long running time
             if reading == [0x03]:
                 print("Laser is ON           ")
-                time.sleep(1)  # avoid too close communication
+                time.sleep(.5)  # avoid too close communication
                 return True  # indicate that the laser is ON
             else:
                 time.sleep(1)  # let time to the OPC-N3 to try to start the laser
@@ -367,7 +367,7 @@ def laser_off():
             # Avoid getting "too much files opened" error after long running time
             if reading == [0x03]:
                 print("Laser is OFF                    ")
-                time.sleep(1)  # avoid too close communication
+                # time.sleep(1)  # avoid too close communication
                 return False
             else:
                 time.sleep(1)  # let time to the OPC-N3 to try to stop the laser
