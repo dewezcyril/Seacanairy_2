@@ -294,7 +294,7 @@ def fan_on():
                     print("Waiting SPI Buffer reset", end='\r')
                     time.sleep(wait_reset_SPI_buffer)
             if attempts >= 3:
-                log = "Failed 3 times to start the fan"
+                log = "Failed 3 consecutive times to start the fan"
                 logger.critical(log)
                 return False  # indicate that fan is OFF
         else:
@@ -340,7 +340,7 @@ def laser_on():
                     print("Waiting SPI Buffer reset", end='\r')
                     time.sleep(wait_reset_SPI_buffer)
             if attempts >= 3:
-                logger.critical("Failed 3 times to start the laser")
+                logger.critical("Failed 3 consecutive times to start the laser")
                 return False  # indicate that laser is still off
         else:
             logger.critical("Failed to start the laser (transmission problem)")
