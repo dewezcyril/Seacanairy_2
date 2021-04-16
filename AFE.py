@@ -144,7 +144,7 @@ def getADCreading(adc_address, adc_channel):
 
     attempts = 0
 
-    print("Reading tension...               ", end='\r')
+    print("Reading tension...                                         ", end='\r')
 
     while attempts < 4:
 

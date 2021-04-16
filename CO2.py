@@ -373,17 +373,17 @@ def get_data():
     :return: Dictionary{"pressure", "temperature", "CO2 average", "CO2 instant"}
     """
     # Read status byte
-    attempts = 1
-    while True:
-        if status(True):
-            break
-        else:
-            print("Waiting for data to be ready...", end='\r')
-            time.sleep(2)
-            attempts += 1
-        if attempts >= 6:
-            print("Sensor not ready, trying to read...", end='\r')
-            break
+    # attempts = 1
+    # while True:
+    #     if status(True):
+    #         break
+    #     else:
+    #         print("Waiting for data to be ready...", end='\r')
+    #         time.sleep(2)
+    #         attempts += 1
+    #     if attempts >= 6:
+    #         print("Sensor not ready, trying to read...", end='\r')
+    #         break
 
     # Get CO2 and pressure
     data1 = getCO2P()
@@ -443,7 +443,6 @@ def trigger_measurement(force=False):
     sensor_status = status(False)  # trigger new measurement
 
     if force:  # if force is True
-        print("Synchronize sensor with Seacanairy sampling period")
         if measurement_delay != 0:  # if user/software want to wait for the data to be ready
             loading_bar("Waiting for sensor sampling", measurement_delay)  # usually 10 seconds (see doc)
             # sensor documentation, let time to the sensor to perform the measurement
@@ -523,7 +522,7 @@ def read_from_custom_memory(index, number_of_bytes):
     :param number_of_bytes: number of bytes to read (see sensor doc)
     :return: list[bytes] from right to left
     """
-    logger.info("Reading " + str(number_of_bytes) + " bytes from customer memory at index " + str(hex(index)) + "...")
+    logger.debug("Reading " + str(number_of_bytes) + " bytes from customer memory at index " + str(hex(index)) + "...")
     write = i2c_msg.write(CO2_address, [0x71, 0x54, index])  # usual bytes to send/write to initiate the reading
     attempts = 1
     read = []  # avoid return issue
@@ -547,7 +546,7 @@ def read_from_custom_memory(index, number_of_bytes):
                 time.sleep(3)  # avoid too close i2c communication, let time to the sensor, may be busy
 
     reading = list(read)
-    logger.info("Reading from custom memory returned " + str(reading))
+    logger.debug("Reading from custom memory returned " + str(reading))
     return reading
 
 
@@ -558,7 +557,7 @@ def write_to_custom_memory(index, *bytes_to_write):
     :param bytes_to_write: unlimited amount of bytes to write
     :return: True (Success) or False (Fail)
     """
-    logger.info("Writing " + str(bytes_to_write) + " inside custom memory at index " + str(hex(index)) + "...")
+    logger.debug("Writing " + str(bytes_to_write) + " inside custom memory at index " + str(hex(index)) + "...")
     crc8 = digest([index, *bytes_to_write])  # calculation of the CRC8 based on the index number and all the bytes sent
     attempts = 1  # trial counter for writing into the customer memory
     cycle = 1  # trial counter for i2c communication
