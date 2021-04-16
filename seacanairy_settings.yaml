@@ -3,10 +3,11 @@
 
 Seacanairy settings:
   # Name of the folder in which the log and data files will be stored:
-  Sampling session name: "dimanche_11_04" #.csv
+  Sampling session name: "15-04-21" #.csv
   # Amount of time between each consecutive measurement
   Sampling period: 60  # seconds
   Flushing time before measurement: 0  # seconds
+  Activate air pump: Yes
 
 
 CO2 sensor:
