@@ -279,6 +279,7 @@ def check(NMEA_line):
         return True
     else:
         logger.warning("Checksum is not correct: calculation is " + str(calc) + "| sensor's checksum is " + str(checksum))
+        logger.warning("NMEA line was: " + str(NMEA_line))
         return False
 
 
