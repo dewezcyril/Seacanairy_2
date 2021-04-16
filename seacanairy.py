@@ -12,7 +12,6 @@ from progress.bar import IncrementalBar  # to show beautiful loading bar on the 
 import os  # to be able to create new files/folders and see the current path
 import yaml  # to read the settings stored in the 'seacanairy_settings.yaml' file
 import logging  # to store the errors messages in a separate log file
-import RPi.GPIO as GPIO  # to put GPIO high/low to switch the air pump relay on and off
 
 # ---------------------------------------
 # SETTINGS
@@ -55,6 +54,7 @@ CO2_activation = settings['CO2 sensor']['Activate this sensor']
 OPCN3_activation = settings['OPC-N3 sensor']['Activate this sensor']
 GPS_activation = settings['GPS']['Activate this sensor']
 AFE_activation = settings['AFE Board']['Activate this sensor']
+air_pump_activation = settings['Seacanairy settings']['Activate air pump']
 
 # Air pump settings
 fresh_air_piping_flushing_time = settings['Seacanairy settings']['Flushing time before measurement']
@@ -94,6 +94,9 @@ if GPS_activation:
 if AFE_activation:
     import AFE
 
+if air_pump_activation:
+    import RPi.GPIO as GPIO  # to put GPIO high/low to switch the air pump relay on and off
+
 # -----------------------------------------
 # LOGGING
 # -----------------------------------------
@@ -126,9 +129,11 @@ logger = logging.getLogger('SEACANAIRY')
 # -----------------------------------------
 # Use the GPIO to turn on and off the air pump via relay
 
-GPIO.setmode(GPIO.BCM)  # use the GPIO names (GPIO1...) instead of the processor pin name (BCM...)
-pump_gpio = 27
-GPIO.setup(pump_gpio, GPIO.OUT, initial=GPIO.LOW)
+if air_pump_activation:
+    GPIO.setwarnings(False)  # avoid messages concerning GPIO (GPIO is already low, blablabla)
+    GPIO.setmode(GPIO.BCM)  # use the GPIO names (GPIO1...) instead of the processor pin name (BCM...)
+    pump_gpio = 27
+    GPIO.setup(pump_gpio, GPIO.OUT, initial=GPIO.LOW)
 
 
 # -----------------------------------------
@@ -158,7 +163,6 @@ def pump_start():
     :return: nothing
     """
     GPIO.output(pump_gpio, GPIO.HIGH)
-    print("Air pump is on")
 
 
 def pump_stop():
@@ -167,7 +171,6 @@ def pump_stop():
     :return: nothing
     """
     GPIO.output(pump_gpio, GPIO.LOW)
-    print("Air pump is off")
 
 
 def append_data_to_csv(*data_to_write):
@@ -270,6 +273,9 @@ if not OPCN3_activation:
 if not GPS_activation:
     logger.warning("GPS has been disabled by the user in 'seacanairy_settings.yaml'")
 
+if not air_pump_activation:
+    logger.warning("Air pump has been disabled by the user in 'seacanairy_settings.yaml'")
+
     # SET INTERNAL CO2 SENSOR TIMESTAMP
 
 if CO2_activation:
@@ -292,7 +298,8 @@ if OPCN3_activation:
 
 if CO2_activation:
     # Ask the CO2 sensor to take a new sample
-    CO2.trigger_measurement(True)
+    print("Synchronize CO2 sensor with Seacanairy sampling period")
+    CO2.trigger_measurement(True)  # True == force
 
 # LOOP
 
@@ -306,7 +313,9 @@ while True:
     # a bit the same as 'millis()' on Arduino
     # easier to work with than with a complex string datetime format and a timedelta function...
 
-    pump_start()  # start the pump
+    if air_pump_activation:
+        pump_start()  # start the pump
+        print("Air pump is on")
 
     # If user want to flush the piping system before beginning the sampling
     if fresh_air_piping_flushing_time != 0:
@@ -315,7 +324,9 @@ while True:
     to_write = []  # create the list in which data to store will be saved
     # [a, b, c] + [d, e, f] = [a, b, c, d, e, f]
 
-    CO2.trigger_measurement()
+    if CO2_activation:
+        print("Trigger CO2 measurement (reading will come later...)")
+        CO2.trigger_measurement()
 
     if OPCN3_activation:
         # Get OPC-N3 sensor data (see 'OPCN3.py')
@@ -337,13 +348,6 @@ while True:
                      OPC_data["reject count out of range"],
                      OPC_data["fan revolution count"], OPC_data["laser status"]]
 
-    if CO2_activation:
-        # Get CO2 sensor data (see 'CO2.py')
-        print("******************* CO2 SENSOR *******************")
-        CO2_data = CO2.get_data()
-        to_write += [CO2_data["relative humidity"], CO2_data["temperature"], CO2_data["pressure"],
-                     CO2_data["average"], CO2_data["instant"]]
-
     if AFE_activation:
         # Get OPC-N3 sensor data (see 'AFE.py')
         print("****************** AFE BOARD ********************")
@@ -354,7 +358,16 @@ while True:
                      AFE_data["SO2 ppm"], AFE_data["SO2 main"], AFE_data["SO2 aux"],
                      AFE_data["CO ppm"], AFE_data["CO main"], AFE_data["CO aux"]]
 
-    pump_stop()
+    if air_pump_activation:
+        pump_stop()
+        print("Air pump is off (pump has run", time.time()-start, "seconds)")
+
+    if CO2_activation:
+        # Get CO2 sensor data (see 'CO2.py')
+        print("******************* CO2 SENSOR *******************")
+        CO2_data = CO2.get_data()
+        to_write += [CO2_data["relative humidity"], CO2_data["temperature"], CO2_data["pressure"],
+                     CO2_data["average"], CO2_data["instant"]]
 
     if GPS_activation:
         # print("Wait switching from SPI to UART...", end='\r')
