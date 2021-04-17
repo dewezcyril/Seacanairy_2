@@ -158,7 +158,8 @@ def getADCreading(adc_address, adc_channel):
             # debug(print("Valor is 0x%x" % valor))
 
             # ----------- End of conversion of the Channel ----------
-            volts = valor * vref / max_reading
+            volts = round(valor * vref / max_reading, 7)
+            # Rounding to 7 decimals because ADC accuracy is 3.9 microvolt
             print("Reading tension...", volts, "V", end='\r')
 
             if (reading[0] & 0b11000000) == 0b11000000:
