@@ -360,7 +360,7 @@ while True:
 
     if air_pump_activation:
         pump_stop()
-        print("Air pump is off (pump has run", time.time()-start, "seconds)")
+        print("Air pump is off (pump has run", round(time.time()-start, 0), "seconds)")
 
     if CO2_activation:
         # Get CO2 sensor data (see 'CO2.py')
