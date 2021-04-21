@@ -324,13 +324,13 @@ def getCO2P():
             except:  # what happens if the i2c fails
                 if reading_trials == max_attempts:
                     logger.critical("i2c transmission failed "
-                                    + str(max_attempts) + " consecutive times, skipping this CO2 and pressure reading")
+                                    + str(max_attempts) + " consecutive times, skipping CO2 and pressure reading (" +
+                                    str(sys.exc_info()) + ")")
                     return data  # indicate clearly that the data are wrong
 
-                logger.error("Error in the i2c transmission, trying again... (" +
-                             str(reading_trials + 1) + "/" + str(max_attempts) + ")")
+                logger.error("Error in the i2c transmission, trying again... (" + str(sys.exc_info()) + ")")
                 reading_trials += 1  # increment of reading_trials
-                print("Waiting 4 seconds...", end='\r')
+                print("Waiting 3 seconds...", end='\r')
                 time.sleep(3)  # if I²C comm fails, wait a little bit and try again (sensor is maybe busy)
 
         # process the data given by the sensor

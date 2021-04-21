@@ -164,8 +164,7 @@ def getADCreading(adc_address, adc_channel):
 
             if (reading[0] & 0b11000000) == 0b11000000:
                 logger.error(
-                    "Input voltage to channel " + str(adc_channel) + " is either open or more than " + str(vref) + "Volts."
-                        " Value read is: " + str(reading[0]))
+                    "Input voltage is either open or more than " + str(vref) + "Volts.")
                 logger.warning("The reading may not be correct. Value read is " + str(volts) + " mV")
 
             time.sleep(sleep)  # be sure to have some time laps between two I2C reading/writing

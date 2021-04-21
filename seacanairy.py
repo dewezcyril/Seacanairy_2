@@ -30,7 +30,7 @@ sampling_period = settings['Seacanairy settings']['Sampling period']
 
 # CO2 sampling period (CO2 sensor takes samples automatically)
 CO2_sampling_period = int(sampling_period / settings['CO2 sensor']['Automatic sampling frequency ' \
-                                                                   '(number of sample during the above sampling period)'] + 10)
+                                                                   '(number of sample during the above sampling period)'])
 
 # Amount of time required for the CO2 sensor to take the measurement
 CO2_startup_delay = settings['CO2 sensor']['Amount of time required for the sensor to take the measurement']
@@ -70,7 +70,7 @@ if not os.path.exists(directory_path):
     print("Created directory", directory_path)
 
 # Create a file to store the log if it doesn't exist
-log_file = directory_path + "-log.log"
+log_file = directory_path + project_name + "-log.log"
 if not os.path.isfile(log_file):
     os.mknod(log_file)  # create the file
     print("Created log file", log_file)
