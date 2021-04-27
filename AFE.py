@@ -4,6 +4,7 @@ import os.path
 import yaml
 import logging
 import sys
+import threading
 
 # --------------------------------------------------
 # I2C
@@ -128,7 +129,7 @@ max_reading = 8388608.0
 
 lange = 0x06  # number of bytes to read in the block
 zeit = 15  # number of seconds to sleep between each measurement
-sleep = 0.5  # number of seconds to sleep between each channel reading
+sleep = 0.2  # number of seconds to sleep between each channel reading
 
 
 # has to be more than 0.2 (seconds)
@@ -144,12 +145,12 @@ def getADCreading(adc_address, adc_channel):
 
     attempts = 0
 
-    print("Reading tension...                                         ", end='\r')
 
     while attempts < 4:
 
         try:
             bus.write_byte(adc_address, adc_channel)
+            # print("Reading tension...                                         ", end='\r')
             time.sleep(sleep)
             reading = bus.read_i2c_block_data(adc_address, adc_channel, lange)
             # ----------- Start conversion for the Channel Data ----------
@@ -160,20 +161,20 @@ def getADCreading(adc_address, adc_channel):
             # ----------- End of conversion of the Channel ----------
             volts = round(valor * vref / max_reading, 7)
             # Rounding to 7 decimals because ADC accuracy is 3.9 microvolt
-            print("Reading tension...", volts, "V", end='\r')
+            # print("Reading tension...", volts, "V", end='\r')
 
             if (reading[0] & 0b11000000) == 0b11000000:
                 logger.error(
                     "Input voltage is either open or more than " + str(vref) + "Volts.")
                 logger.warning("The reading may not be correct. Value read is " + str(volts) + " mV")
 
-            time.sleep(sleep)  # be sure to have some time laps between two I2C reading/writing
+            # time.sleep(sleep)  # be sure to have some time laps between two I2C reading/writing # i2c don't care!
             return volts
 
         except:
             if attempts >= 3:
                 logger.critical("i2c transmission failed 3 consecutive times(" + str(sys.exc_info())
-                         + "), skipping i2c reading")
+                                + "), skipping i2c reading")
                 return False  # indicate clearly that system has failed
 
             logger.error("Error in the i2c transmission (" + str(sys.exc_info())
@@ -204,13 +205,11 @@ def get_temp():
 
         temp_to_return = {
             "temperature raw": tempv,
-            "temperature": "-"
         }
     else:
         logger.critical("Failed to read temperature")
         temp_to_return = {
             "temperature raw": "error",
-            "temperature": "-"
         }
 
     return temp_to_return
@@ -235,14 +234,12 @@ def get_NO2():
         NO2_to_return = {
             "NO2 main": NO2v_main,
             "NO2 aux": NO2v_aux,
-            "NO2 ppm": "-"
         }
     else:
         logger.critical("Failed to read NO2 sensor")
         NO2_to_return = {
             "NO2 main": "error",
             "NO2 aux": "error",
-            "NO2 ppm": "error"
         }
 
     return NO2_to_return
@@ -265,7 +262,6 @@ def get_OX():
         OX_to_return = {
             "OX main": Oxv_main,
             "OX aux": Oxv_aux,
-            "OX ppm": "-"
         }
 
     else:
@@ -273,7 +269,6 @@ def get_OX():
         OX_to_return = {
             "OX main": "error",
             "OX aux": "error",
-            "OX ppm": "error"
         }
 
     return OX_to_return
@@ -296,7 +291,6 @@ def get_SO2():
         SO2_to_return = {
             "SO2 main": SO2v_main,
             "SO2 aux": SO2v_aux,
-            "SO2 ppm": "-"
         }
 
     else:
@@ -305,7 +299,6 @@ def get_SO2():
         SO2_to_return = {
             "SO2 main": "error",
             "SO2 aux": "error",
-            "SO2 ppm": "error"
         }
 
     return SO2_to_return
@@ -328,7 +321,6 @@ def get_CO():
         CO2_to_return = {
             "CO main": COv_main,
             "CO aux": COv_aux,
-            "CO ppm": "-"
         }
     else:
         logger.critical("Failed to read CO")
@@ -336,89 +328,190 @@ def get_CO():
         CO2_to_return = {
             "CO main": "error",
             "CO aux": "error",
-            "CO ppm": "error"
         }
 
     return CO2_to_return
 
 
-def getdata(average=None, interval=0.5):
+def apply_calibration(dictionary):
+    dictionary.update({
+        'NO2 ppm': "-",
+        'OX ppm': "-",
+        'SO2 ppm': "-",
+        'CO ppm': "-",
+        'temperature': "-"
+    })
+    return dictionary
+
+
+def getdata():
     """
-    Get all available data from the 4-AFE Alphasense Board
-    :param average: number of measurement to take to make average
-    :param interval: interval of time between those measurements
-    :return: List[temperature, NO2, OX, SO2, CO]
+    Get all available data from the 4-AFE Alphasense Board (one instant reading)
+    :return: Dictionary{'NO2 ppm', NO2 main', 'NO2 aux', 'OX ppm', 'OX main', 'OX aux',
+                'SO2 ppm', 'SO2 main', 'SO2 aux', 'CO ppm', 'CO main', 'CO aux',
+                'temperature', 'temperature raw'}
     """
 
-    to_return = {}
+    data = {}
 
-    if average is not None:
-        temperature = []
-        NO2 = []
-        OX = []
-        SO2 = []
-        CO = []
+    data.update(get_NO2())
+    data.update(get_OX())
+    data.update(get_SO2())
+    data.update(get_CO())
+    data.update(get_temp())
+    data = apply_calibration(data)
+    print("\t\tppm\t|\tmain (mV)\t\t|\taux (mV)")
+    print("NO2:\t", data["NO2 ppm"],"\t|\t", data["NO2 main"], "\t|\t", data["NO2 aux"])
+    print("OX:\t", data["OX ppm"], "\t|\t", data["OX main"], "\t|\t", data["OX aux"])
+    print("SO2:\t", data["SO2 ppm"], "\t|\t", data["SO2 main"], "\t|\t", data["SO2 aux"])
+    print("CO:\t", data["CO ppm"], "\t|\t", data["CO main"], "\t|\t", data["CO aux"])
+    print("Temperature:\t", data["temperature"], "\t|\t", data["temperature raw"])
 
-        for _ in range(average):
-            temperature.append(temp())
-            NO2.append(NO2())
-            OX.append(OX())
-            SO2.append(SO2())
-            CO.append(CO())
-            time.sleep(interval)
-        sum_temperature = 0
-        sum_NO2 = 0
-        sum_OX = 0
-        sum_SO2 = 0
-        sum_CO = 0
-        for i in range(average):
-            sum_temperature += temperature[i]
-            sum_NO2 += NO2[i]
-            sum_OX += OX[i]
-            sum_SO2 = SO2[i]
-            sum_CO = CO[i]
+    return data
 
-        temperature = sum_temperature / average
-        NO2 = sum_NO2 / average
-        OX = sum_OX / average
-        SO2 = sum_SO2 / average
-        CO = sum_CO / average
-        return [temperature, NO2, OX, SO2, CO]
 
-    elif average is None:
-        print("\t\tppm\t|\tmain (mV)\t\t|\taux (mV)")
-        NO2_data = get_NO2()
-        print("                                                                      ", end='\r')
-        print("NO2:\t", NO2_data["NO2 ppm"],"\t|\t", NO2_data["NO2 main"], "\t|\t", NO2_data["NO2 aux"])
-        to_return.update(NO2_data)
-        OX_data = get_OX()
-        print("                                                                      ", end='\r')
-        print("OX:\t", OX_data["OX ppm"], "\t|\t", OX_data["OX main"], "\t|\t", OX_data["OX aux"])
-        to_return.update(OX_data)
-        SO2_data = get_SO2()
-        print("                                                                      ", end='\r')
-        print("SO2:\t", SO2_data["SO2 ppm"], "\t|\t", SO2_data["SO2 main"], "\t|\t", SO2_data["SO2 aux"])
-        to_return.update(SO2_data)
-        CO_data = get_CO()
-        print("                                                                      ", end='\r')
-        print("CO:\t", CO_data["CO ppm"], "\t|\t", CO_data["CO main"], "\t|\t", CO_data["CO aux"])
-        to_return.update(CO_data)
+def start_averaged_data(number_of_measurements, waiting=0):
+    """
+    Take some measurements, and make an average of them.
+    :param number_of_measurements: number of measurement, around 2 seconds for each one
+    :return: Dictionary{'NO2 main', 'NO2 aux', 'OX main', 'OX aux',
+                'SO2 main', 'SO2 aux', 'CO main', 'CO aux',
+                'temperature raw'}
+    """
+
+    time.sleep(waiting)  # for threading
+
+    NO2_main = []
+    NO2_aux = []
+    
+    OX_main = []
+    OX_aux = []
+    
+    SO2_main = []
+    SO2_aux = []
+    
+    CO_main = []
+    CO_aux = []
+    
+    temperature_main = []
+    
+    for _ in range(number_of_measurements):
+        NO2 = get_NO2()
+        NO2_main += [NO2['NO2 main']]
+        NO2_aux += [NO2['NO2 aux']]
+        
+        OX = get_OX()
+        OX_main += [OX['OX main']]
+        OX_aux += [OX['OX aux']]
+        
+        SO2 = get_SO2()
+        SO2_main += [SO2['SO2 main']]
+        SO2_aux += [SO2['SO2 aux']]
+        
+        CO = get_CO()
+        CO_main += [CO['CO main']]
+        CO_aux += [CO['CO aux']]
+
         temp = get_temp()
-        print("                                                                      ", end='\r')
-        print("Temperature:\t", temp["temperature"], "\t|\t", temp["temperature raw"])
-        to_return.update(temp)
+        temperature_main += [temp['temperature raw']]
+    
+    sum = 0
+    
+    for i in range(len(NO2_main)):
+        sum += NO2_main[i]
+    NO2_main = sum/len(NO2_main)
 
-        return to_return
+    sum = 0
 
-    else:
-        raise TypeError("Check arguments of AFE.getdata()")
+    for i in range(len(NO2_aux)):
+        sum += NO2_aux[i]
+    NO2_aux = sum/len(NO2_aux)
+
+    sum = 0
+
+    for i in range(len(OX_main)):
+        sum += OX_main[i]
+    OX_main = sum/len(OX_main)
+
+    sum = 0
+
+    for i in range(len(OX_aux)):
+        sum += OX_aux[i]
+    OX_aux = sum/len(OX_aux)
+
+    sum = 0
+
+    for i in range(len(SO2_main)):
+        sum += SO2_main[i]
+    SO2_main = sum/len(SO2_main)
+
+    sum = 0
+
+    for i in range(len(SO2_aux)):
+        sum += SO2_aux[i]
+    SO2_aux = sum/len(SO2_aux)
+
+    sum = 0
+
+    for i in range(len(CO_main)):
+        sum += CO_main[i]
+    CO_main = sum/len(CO_main)
+
+    sum = 0
+
+    for i in range(len(CO_aux)):
+        sum += CO_aux[i]
+    CO_aux = sum/len(CO_aux)
+
+    sum = 0
+
+    for i in range(len(temperature_main)):
+        sum += temperature_main[i]
+    temperature = sum/len(temperature_main)
+
+    global thread_data
+
+    thread_data = {
+        'NO2 main': NO2_main,
+        'NO2 aux': NO2_aux,
+        'OX main': OX_main,
+        'OX aux': OX_aux,
+        'SO2 main': SO2_main,
+        'SO2 aux': SO2_aux,
+        'CO main': CO_main,
+        'CO aux': CO_aux,
+        'temperature raw': temperature
+    }
+
+    return thread_data
+
+
+def start_background_average_measurement(number_of_measurements, delay=0):
+    print("Starting background AFE average reading...")
+    x = threading.Thread(target=start_averaged_data, args=([number_of_measurements, delay]), daemon=True)
+    x.start()
+
+
+def get_averaged_data():
+    global thread_data
+
+    data = apply_calibration(thread_data)
+
+    print("NO2:\t", data["NO2 ppm"],"\t|\t", data["NO2 main"], "\t|\t", data["NO2 aux"])
+    print("OX:\t", data["OX ppm"], "\t|\t", data["OX main"], "\t|\t", data["OX aux"])
+    print("SO2:\t", data["SO2 ppm"], "\t|\t", data["SO2 main"], "\t|\t", data["SO2 aux"])
+    print("CO:\t", data["CO ppm"], "\t|\t", data["CO main"], "\t|\t", data["CO aux"])
+    print("Temperature:\t", data["temperature"], "\t|\t", data["temperature raw"])
+
+    return data
 
 
 # open the file where the data will be stored
 if __name__ == "__main__":
     # Execute an execution test if the script is executed from there
     while (True):
-        data = getdata()
-        print(data)
+        start_background_average_measurement(3)
+        time.sleep(20)
+        get_average_data()
         print("WAITING...")
-        time.sleep(10)
+        time.sleep(5)

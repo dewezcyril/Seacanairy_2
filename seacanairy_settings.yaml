@@ -3,7 +3,7 @@
 
 Seacanairy settings:
   # Name of the folder in which the log and data files will be stored:
-  Sampling session name: "15-04-21" #.csv
+  Sampling session name: "threading_trial" #.csv
   # Amount of time between each consecutive measurement
   Sampling period: 60  # seconds
   Flushing time before measurement: 0  # seconds
@@ -28,6 +28,12 @@ OPC-N3 sensor:
   Sampling time: 4
   Fan speed: 100 # 0 = the slowest, 100 = the fastest
   Take a new measurement if checksum is wrong (avoid shorter sampling periods when errors): Yes
+  Store debug messages (important increase of logs): No
+
+
+Air flow sensor:
+  Activate this sensor: Yes
+  Measure during OPCN3 measurement: Yes
   Store debug messages (important increase of logs): No
 
 

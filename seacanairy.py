@@ -12,12 +12,24 @@ from progress.bar import IncrementalBar  # to show beautiful loading bar on the 
 import os  # to be able to create new files/folders and see the current path
 import yaml  # to read the settings stored in the 'seacanairy_settings.yaml' file
 import logging  # to store the errors messages in a separate log file
+import threading
+
+# ---------------------------------------
+# CHECK THE TIME
+# ---------------------------------------
+print("################# TIME #################")
+print("Current date and time is:", datetime.now())
+print("If time is not correct, execute:")
+print("\tsudo hwclock -s\tapply RTC time to the system")
+print("\ttimedatectl\tshow current time status")
 
 # ---------------------------------------
 # SETTINGS
 # ---------------------------------------
 # Import the settings from the Yaml file
 # Store the different settings in dedicated variables to get it more easy
+
+print("################ FILES #################")
 
 current_working_directory = str(os.getcwd())  # returns the path where the python script is currently running
 
@@ -55,6 +67,8 @@ OPCN3_activation = settings['OPC-N3 sensor']['Activate this sensor']
 GPS_activation = settings['GPS']['Activate this sensor']
 AFE_activation = settings['AFE Board']['Activate this sensor']
 air_pump_activation = settings['Seacanairy settings']['Activate air pump']
+flow_sensor_activation = settings['Air flow sensor']['Activate this sensor']
+OPCN3_flow_measurement = settings['Air flow sensor']['Measure during OPCN3 measurement']
 
 # Air pump settings
 fresh_air_piping_flushing_time = settings['Seacanairy settings']['Flushing time before measurement']
@@ -96,6 +110,9 @@ if AFE_activation:
 
 if air_pump_activation:
     import RPi.GPIO as GPIO  # to put GPIO high/low to switch the air pump relay on and off
+
+if flow_sensor_activation:
+    import sensirion_mass_flow_meter as flow
 
 # -----------------------------------------
 # LOGGING
@@ -180,7 +197,14 @@ def append_data_to_csv(*data_to_write):
     :param data_to_write: unlimited amount of arguments
     :return: nothing
     """
-    to_write = [*data_to_write]  # Concatenate all the arguments in one list
+    to_write = []
+    for i in data_to_write:
+        if isinstance(i, list):
+            to_write += i
+        else:
+            to_write += [i]
+
+    # to_write = [*data_to_write]  # Concatenate all the arguments in one list
 
     with open(csv_file, mode='a', newline='') as data_file:
         writer = csv.writer(data_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
@@ -225,10 +249,6 @@ def wait_timestamp(starting_time):
 # --------------------------------------------
 # MAIN CODE
 # --------------------------------------------
-# Keep a trace of the day and time at which the system has started
-
-now = datetime.now()  # get time
-logger.info("Starting of Seacanairy on the " + str(now.strftime("%d/%m/%Y at %H:%M:%S")))  # delete time decimals
 
 # INITIATE CSV FILE
 
@@ -236,31 +256,59 @@ logger.info("Starting of Seacanairy on the " + str(now.strftime("%d/%m/%Y at %H:
 csv_file = directory_path + "/" + str(project_name) + "-data.csv"
 if not os.path.isfile(csv_file):  # if the file doesn't exist
     os.mknod(csv_file)  # create the file
-    print("Created data file", csv_file)
+    print("Initializing data file", csv_file)
     # Write a first line to the file, this will be the column headers
-    append_data_to_csv("Date/Time", "Relative Humidity (%RH)", "Temperature (°C)", "Pressure (hPa)",
-                       "CO2 average (ppm)", "CO2 instant (ppm)",
-                       "PM 1 (μg/m³)", "PM 2.5 (μg/m³)", "PM 10 (μg/m³)",
-                       "Temperature OPC (°C)", "Relative Humidity OPC (%RH)",
-                       "sampling time OPC (sec)", "sample flow rate OPC (ml/s)",
-                       "bin 0", "bin 1", "bin 2", "bin 3", "bin 4", "bin 5",
-                       "bin 6", "bin 7", "bin 8", "bin 9", "bin 10", "bin 11",
-                       "bin 12", "bin 13", "bin 14", "bin 15", "bin 16", "bin 17",
-                       "bin 18", "bin 19", "bin 20", "bin 21", "bin 22", "bin 23",
-                       "bin 1 MToF", "bin 3 MToF", "bin 5 MToF", "bin 7 MToF",
-                       "reject count glitch", "reject count long TOF", "reject count ratio",
-                       "reject count out of range", "fan revolution count", "laser status",
-                       "temperature (°C)", "temperature (mV)",
-                       "NO2 (ppm)", "NO2 main (mV)", "NO2 aux (mV)",
-                       "OX (ppm)", "OX main (mV)", "OX aux (mV)",
-                       "SO2 (ppm)", "SO2 main (mV)", "SO2 aux (mV)",
-                       "CO2 (ppm)", "CO2 main (mV)", "CO2 aux (mV)",
-                       "Date and time (UTC)",
-                       "GPS fix date and time (UTC)", "latitude", "longitude", "SOG (kts)", "COG",
-                       "horizontal dilution of precision", "accuracy",
-                       "altitude (m)", "WGS84 correction (m)", "fix type", "sensor status")
+    to_write = []
+    to_write += ["Date/Time"]
+
+
+    # for the OPC-N3 sensor:
+    to_write += ["PM 1 (μg/m³)", "PM 2.5 (μg/m³)", "PM 10 (μg/m³)",
+                 "Temperature OPC (°C)", "Relative Humidity OPC (%RH)",
+                 "sampling time OPC (sec)", "sample flow rate OPC (ml/s)",
+                 "bin 0", "bin 1", "bin 2", "bin 3", "bin 4", "bin 5",
+                 "bin 6", "bin 7", "bin 8", "bin 9", "bin 10", "bin 11",
+                 "bin 12", "bin 13", "bin 14", "bin 15", "bin 16", "bin 17",
+                 "bin 18", "bin 19", "bin 20", "bin 21", "bin 22", "bin 23",
+                 "bin 1 MToF", "bin 3 MToF", "bin 5 MToF", "bin 7 MToF",
+                 "reject count glitch", "reject count long TOF", "reject count ratio",
+                 "reject count out of range", "fan revolution count", "laser status"]
+
+    # for the OPC-N3 flow measurement:
+    to_write += ["average flow[sccm]", "average flow [slm]", "average flow [slh]"]
+
+    # for the AFE:
+    to_write += ["temperature (°C)", "temperature (mV)",
+                 "NO2 (ppm)", "NO2 main (mV)", "NO2 aux (mV)",
+                 "OX (ppm)", "OX main (mV)", "OX aux (mV)",
+                 "SO2 (ppm)", "SO2 main (mV)", "SO2 aux (mV)",
+                 "CO2 (ppm)", "CO2 main (mV)", "CO2 aux (mV)"]
+
+    # for the flow sensor:
+    to_write += ["flow (sccm)", "flow (slm)", "flow (slh)"]
+
+    # for the CO2 sensor:
+    to_write += ["Relative Humidity (%RH)", "Temperature (°C)", "Pressure (hPa)",
+                 "CO2 average (ppm)", "CO2 instant (ppm)"]
+
+    # for the GPS:
+    to_write += ["Date and time (UTC)",
+                 "GPS fix date and time (UTC)", "latitude", "longitude", "SOG (kts)", "COG",
+                 "horizontal dilution of precision", "accuracy",
+                 "altitude (m)", "WGS84 correction (m)", "fix type", "GPS status"]
+
+    append_data_to_csv(to_write)
+
 else:
     logger.info("'" + str(csv_file) + "' already exist, appending data to this file")
+
+
+print("########### STARTING SENSORS ############")
+
+# Keep a trace of the day and time at which the system has started
+
+now = datetime.now()  # get time
+logger.info("Starting of Seacanairy on the " + str(now.strftime("%d/%m/%Y at %H:%M:%S")))  # delete time decimals
 
 # WARN USER IF A SENSOR IS DEACTIVATED
 
@@ -276,7 +324,7 @@ if not GPS_activation:
 if not air_pump_activation:
     logger.warning("Air pump has been disabled by the user in 'seacanairy_settings.yaml'")
 
-    # SET INTERNAL CO2 SENSOR TIMESTAMP
+# SET INTERNAL CO2 SENSOR TIMESTAMP
 
 if CO2_activation:
     # Read the internal timestamp of the CO2 sensor, and change the value if necessary
@@ -300,6 +348,9 @@ if CO2_activation:
     # Ask the CO2 sensor to take a new sample
     print("Synchronize CO2 sensor with Seacanairy sampling period")
     CO2.trigger_measurement(True)  # True == force
+
+
+print("############## SAMPLING! ###############")
 
 # LOOP
 
@@ -328,7 +379,16 @@ while True:
         print("Trigger CO2 measurement (reading will come later...)")
         CO2.trigger_measurement()
 
+    if AFE_activation:
+        AFE_thread = threading.Thread(target=AFE.start_background_average_measurement, args=[4], daemon=True)
+        print("Reading averaged AFE in background...")
+        AFE_thread.start()
+
     if OPCN3_activation:
+        # Start Flow Rate thread
+        flow_thread = threading.Thread(target=flow.start_averaged_measurement, args=[4, 3, 12], daemon=True)
+        print("Reading flow rate in background")
+        flow_thread.start()
         # Get OPC-N3 sensor data (see 'OPCN3.py')
         print("********************* OPC-N3 *********************")
         OPC_data = OPCN3.getdata(OPC_flushing_time, OPC_sampling_time)
@@ -348,19 +408,36 @@ while True:
                      OPC_data["reject count out of range"],
                      OPC_data["fan revolution count"], OPC_data["laser status"]]
 
+        print("**************** OPC FLOW AVERAGE ****************")
+        print("Finishing reading averaged flow rate...", end='\r')
+        print("                                        ", end='\r')
+        flow_thread.join()
+        flow_OPC_data = flow.get_averaged_measurement()
+        to_write += [flow_OPC_data['average flow [sccm]'], flow_OPC_data['average flow [slm]'],
+                     flow_OPC_data['average flow [slh]']]
+
     if AFE_activation:
         # Get OPC-N3 sensor data (see 'AFE.py')
         print("****************** AFE BOARD ********************")
-        AFE_data = AFE.getdata()
+        print("Finishing reading averaged AFE...", end='\r')
+        AFE_thread.join()
+        print("                                  ", end='\r')
+        AFE_data = AFE.get_averaged_data()
         to_write += [AFE_data["temperature"], AFE_data["temperature raw"],
                      AFE_data["NO2 ppm"], AFE_data["NO2 main"], AFE_data["NO2 aux"],
                      AFE_data["OX ppm"], AFE_data["OX main"], AFE_data["OX aux"],
                      AFE_data["SO2 ppm"], AFE_data["SO2 main"], AFE_data["SO2 aux"],
                      AFE_data["CO ppm"], AFE_data["CO main"], AFE_data["CO aux"]]
 
+    if flow_sensor_activation:
+        # get flow measure
+        print("******************* FLOW METER *******************")
+        flow_data = flow.get_data()
+        to_write += [flow_data['flow [sccm]'], flow_data['flow [slm]'], flow_data['flow [slh]']]
+
     if air_pump_activation:
         pump_stop()
-        print("Air pump is off (pump has run", round(time.time()-start, 0), "seconds)")
+        print("Air pump is off (pump has run", round(time.time() - start, 0), "seconds)")
 
     if CO2_activation:
         # Get CO2 sensor data (see 'CO2.py')
@@ -368,7 +445,6 @@ while True:
         CO2_data = CO2.get_data()
         to_write += [CO2_data["relative humidity"], CO2_data["temperature"], CO2_data["pressure"],
                      CO2_data["average"], CO2_data["instant"]]
-
     if GPS_activation:
         # print("Wait switching from SPI to UART...", end='\r')
         # time.sleep(1)  # avoid too close communication between SPI of OPC and UART of GPS
@@ -381,7 +457,7 @@ while True:
                      GPS_data["altitude"], GPS_data["WGS84 correction"], GPS_data["fix status"], GPS_data["status"]]
 
     # Store everything in the csv file
-    append_data_to_csv(now, *to_write)
+    append_data_to_csv(now, to_write)
 
     # Time at which the sampling finishes
     finish = time.time()  # as previously, expressed in seconds since reference date

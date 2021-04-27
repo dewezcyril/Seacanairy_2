@@ -161,9 +161,10 @@ def decode_NMEA(data):
     data = data.split("\r\n")  # create a list of lines (\r\n is sent by the sensor at the end of each line)
     to_return = {}
     for i in range(len(data)):  # don't know at which line data will be send, so it will search for the good line
-        print(data[i], end='\r')
+        print("Decode data...", end='\r')
+        # print(data[i], end='\r')
         # time.sleep(.1)  # let a bit of time for the user to see the data returned by the GPS
-        print("                                                                                          ", end='\r')
+        # print("                                                                                          ", end='\r')
         if data[i][0:6] == "$GPRMC":
             if check(data[i]):
                 GPRMC = data[i].split(",")
@@ -313,7 +314,7 @@ def get_position():
     while attempts <= 4:
         reading = get_raw_reading()
         if not reading:  # if it failed to read UART, it returns False
-            logger.critical("Unable to read GPS data, skipping reading")
+            logger.critical("Unable to read GPS sensor, skipping reading")
             return to_return  # return a dictionary full of "error"
         else:
             try:  # avoid errors because of 'I don't know why the sensor sometimes delete items in the NMEA at random'

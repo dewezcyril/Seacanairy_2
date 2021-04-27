@@ -177,7 +177,7 @@ def check(checksum, data):
                      ", seacanairy checksum is: " + str(calculation) +
                      ", data returned by the sensor is:" + str(data))
         if data[0] and data[1] == 0:
-            logger.debug("Sensor returned 0 values, it is not ready, waiting a bit")
+            logger.debug("Sensor returned 0 values, it is not ready, waiting a little bit")
             print("Sensor not ready, waiting...", end='\r')
             time.sleep(3)
         return False
@@ -562,44 +562,28 @@ def write_to_custom_memory(index, *bytes_to_write):
     attempts = 1  # trial counter for writing into the customer memory
     cycle = 1  # trial counter for i2c communication
 
-    while cycle < 4 and attempts < 4:
-        try:
-            with SMBus(1) as bus:
-                write = i2c_msg.write(CO2_address, [0x71, 0x54, index, *bytes_to_write, crc8])  # see sensor doc
-                bus.i2c_rdwr(write)
-                logger.debug("i2c writing succeeded")
-                # i2c writing function worked, and sensor didn't replied a NACK on the SCK line
-                # (see i2c working principle/theory)
+    try:
+        with SMBus(1) as bus:
+            write = i2c_msg.write(CO2_address, [0x71, 0x54, index, *bytes_to_write, crc8])  # see sensor doc
+            bus.i2c_rdwr(write)
+            logger.debug("i2c writing succeeded")
+            # i2c writing function worked, and sensor didn't replied a NACK on the SCK line
+            # (see i2c working principle/theory)
 
-        except:
-            if attempts >= 3:
-                logger.error("i2c communication failed 3 times while writing to customer memory, skipping writing")
-                return False  # indicate that the writing process failed, exit this function
-            else:
-                logger.warning("i2c communication failed to write into customer memory (" + str(cycle) + "/3)")
-                cycle += 1
-                time.sleep(1)
+    except:
+        logger.critical("i2c failure while writing to custom memory")
+        return False
 
-        # check that the data are written correctly
-        time.sleep(0.3)
-        reading = read_from_custom_memory(index, len(bytes_to_write))
-        cycle = 1  # reset the attempts counter, let the chance of the sensor to fail 3 i2c communication...
-        # ...each time it fails the writing process
-        if reading == [*bytes_to_write]:  # because reading returns a list
-            logger.debug("Success in writing " + str(bytes_to_write) + " inside custom memory at index " + str(index))
-            return reading  # indicate that the writing process succeeded
-        if attempts >= 3:
-            logger.critical("Failed 3 consecutive times to write " + str(bytes_to_write) +
-                            " into customer memory at index " + str(hex(index)))
-            return False  # indicate that the writing process failed
-        else:
-            logger.error(
-                "Failed in writing " + str(bytes_to_write) + " inside custom memory at index " + str(hex(index))
-                + " (" + str(attempts) + "/3), trying again")
-            logger.debug("Value read is " + str(reading) + " in place of " + str(bytes_to_write))
-            time.sleep(2)  # avoid too close i2c communication
-            attempts += 1
+    # check that the data are written correctly
+    time.sleep(0.3)
+    reading = read_from_custom_memory(index, len(bytes_to_write))
+    if reading == [*bytes_to_write]:  # because reading returns a list
+        logger.debug("Success in writing " + str(bytes_to_write) + " inside custom memory at index " + str(index))
+        return reading  # indicate that the writing process succeeded
 
+    else:
+        logger.error("Failed in writing " + str(bytes_to_write) + " inside custom memory at index " + str(hex(index)))
+        logger.debug("Value read is " + str(reading) + " in place of " + str(bytes_to_write))
 
 # ---------------------------------------------------------------------
 # Test Execution
