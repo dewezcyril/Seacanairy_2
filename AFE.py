@@ -199,7 +199,7 @@ def get_temp():
 
     volts = getADCreading(address, channel0)
     if volts is not False:
-        tempv = ch0_mult * volts
+        tempv = round(ch0_mult * volts, 5)
         logger.debug("Tension from temperature sensor (AFE board) is " + str(tempv) + " mV")
         time.sleep(sleep)
 
@@ -222,10 +222,10 @@ def get_NO2():
     """
     volts = getADCreading(address, channel1)
     if volts is not False:
-        NO2v_main = ch0_mult * volts
+        NO2v_main = round(ch0_mult * volts, 5)
         logger.debug("Tension from NO2 sensor (main) is " + str(NO2v_main) + " mV")
         time.sleep(sleep)
-        NO2v_aux = ch0_mult * getADCreading(address, channel2)
+        NO2v_aux = round(ch0_mult * getADCreading(address, channel2), 5)
         logger.debug("Tension from NO2 sensor (aux) is " + str(NO2v_aux) + " mV")
         time.sleep(sleep)
 
@@ -252,10 +252,10 @@ def get_OX():
     """
     volts = getADCreading(address, channel3)
     if volts is not False:
-        Oxv_main = ch0_mult * volts
+        Oxv_main = round(ch0_mult * volts, 5)
         logger.debug("Tension from Ox sensor (main) is " + str(Oxv_main) + " mV")
         time.sleep(sleep)
-        Oxv_aux = ch0_mult * getADCreading(address, channel4)
+        Oxv_aux = round(ch0_mult * getADCreading(address, channel4), 5)
         logger.debug("Tension from Ox sensor (aux) is " + str(Oxv_aux) + " mV")
         time.sleep(sleep)
 
@@ -281,10 +281,10 @@ def get_SO2():
     """
     volts = getADCreading(address, channel5)
     if volts is not False:
-        SO2v_main = ch0_mult * volts
+        SO2v_main = round(ch0_mult * volts, 5)
         logger.debug("Tension from SO2 sensor (main) is " + str(SO2v_main) + " mV")
         time.sleep(sleep)
-        SO2v_aux = ch0_mult * getADCreading(address, channel6)
+        SO2v_aux = round(ch0_mult * getADCreading(address, channel6), 5)
         logger.debug("Tension from SO2 sensor (aux) is " + str(SO2v_aux) + " mV")
         time.sleep(sleep)
 
@@ -311,10 +311,10 @@ def get_CO():
     """
     volts = getADCreading(address, channel7)
     if volts is not False:
-        COv_main = ch0_mult * volts
+        COv_main = round(ch0_mult * volts, 5)
         time.sleep(sleep)
         logger.debug("Tension from CO sensor (main) is " + str(COv_main) + " mV")
-        COv_aux = ch0_mult * getADCreading(address, channel8)
+        COv_aux = round(ch0_mult * getADCreading(address, channel8), 5)
         logger.debug("Tension from CO sensor (aux) is " + str(COv_aux) + " mV")
         time.sleep(sleep)
 
@@ -512,6 +512,6 @@ if __name__ == "__main__":
     while (True):
         start_background_average_measurement(3)
         time.sleep(20)
-        get_average_data()
+        get_averaged_data()
         print("WAITING...")
         time.sleep(5)

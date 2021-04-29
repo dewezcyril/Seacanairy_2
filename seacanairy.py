@@ -20,8 +20,8 @@ import threading
 print("################# TIME #################")
 print("Current date and time is:", datetime.now())
 print("If time is not correct, execute:")
-print("\tsudo hwclock -s\tapply RTC time to the system")
-print("\ttimedatectl\tshow current time status")
+print("\tsudo hwclock -s\t\tapply RTC time to the system")
+print("\ttimedatectl\t\tshow current time status")
 
 # ---------------------------------------
 # SETTINGS
@@ -127,6 +127,7 @@ logging.basicConfig(level=message_level,
                     datefmt='%d-%m %H:%M:%S',
                     filename=log_file,
                     filemode='a')
+logging.info("***********************************************")
 # define a Handler which writes INFO messages or higher to the sys.stderr/display
 console = logging.StreamHandler()
 console.setLevel(message_level)
@@ -234,7 +235,7 @@ def wait_timestamp(starting_time):
             to_wait = round(next_launching - now, 0)  # amount of time system will wait
             print("Waiting before next measurement:", int(to_wait), "seconds (sampling time is set on",
                   sampling_period,
-                  "seconds)", end="\r")
+                  "seconds)  ", end="\r")
             time.sleep(.2)
         else:
             break
@@ -376,18 +377,22 @@ while True:
     # [a, b, c] + [d, e, f] = [a, b, c, d, e, f]
 
     if CO2_activation:
-        print("Trigger CO2 measurement (reading will come later...)")
+        print("Trigger CO2 measurement (readings will come later...)")
         CO2.trigger_measurement()
 
     if AFE_activation:
-        AFE_thread = threading.Thread(target=AFE.start_background_average_measurement, args=[4], daemon=True)
-        print("Reading averaged AFE in background...")
+        AFE_thread = threading.Thread(target=AFE.start_averaged_data, args=[4], daemon=True)
+        print("Reading averaged AFE in background (readings will come later...)")
         AFE_thread.start()
 
     if OPCN3_activation:
         # Start Flow Rate thread
-        flow_thread = threading.Thread(target=flow.start_averaged_measurement, args=[4, 3, 12], daemon=True)
-        print("Reading flow rate in background")
+        flow_period = 4
+        flow_number_measurements = 4
+        flow_delay = 3
+        flow_thread = threading.Thread(target=flow.start_averaged_measurement, args=[flow_period, flow_number_measurements, flow_delay], daemon=True)
+        print("Reading flow rate during", flow_period, "seconds after", flow_delay,
+              "seconds delay in background (readings will come later...)")
         flow_thread.start()
         # Get OPC-N3 sensor data (see 'OPCN3.py')
         print("********************* OPC-N3 *********************")
@@ -410,8 +415,8 @@ while True:
 
         print("**************** OPC FLOW AVERAGE ****************")
         print("Finishing reading averaged flow rate...", end='\r')
-        print("                                        ", end='\r')
         flow_thread.join()
+        print("                                        ", end='\r')
         flow_OPC_data = flow.get_averaged_measurement()
         to_write += [flow_OPC_data['average flow [sccm]'], flow_OPC_data['average flow [slm]'],
                      flow_OPC_data['average flow [slh]']]

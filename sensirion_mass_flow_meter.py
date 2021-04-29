@@ -257,7 +257,6 @@ def get_data(print_data=True):
 
 
 def start_averaged_measurement(sampling_period, number_of_measurement_during_sampling_period, delay=0):
-    print("Reading flow during", sampling_period, "seconds after", delay, "seconds delay...")
     global sccm
     global slm
     global slh
