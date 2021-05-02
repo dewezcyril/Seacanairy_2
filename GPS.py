@@ -99,12 +99,13 @@ else:  # if this file is considered as a library (if you execute 'seacanairy.py'
 # GPIO.output(25, GPIO.LOW)
 
 
-def get_raw_reading():
+def get_raw_reading(close_UART=True):
     """
     Get raw GPS reading via UART
     Read all the lines available on the UART port
     :return: raw data from the GPS
     """
+    global ser
     port = '/dev/ttyAMA0'
     try:
         # USB = '/dev/ttyACM0'
@@ -120,9 +121,11 @@ def get_raw_reading():
             ser.flush()  # flush the buffer
             time.sleep(1)
             reading = ser.read_all()
-            ser.close()
+            if close_UART:
+                ser.close()  # avoid unnecessary port closing if second reading is requested
         except:
             logger.critical("Failed to read GPS data on UART port " + str(port) + " (" + str(sys.exc_info()) + ")")
+            ser.close()
             return False  # indicate error
     except:
         logger.critical("Failed to initiate UART port " + str(port) + " (" + str(sys.exc_info()) + ")")
@@ -294,6 +297,7 @@ def get_position():
     """
     logger.debug("Get position")
 
+    global ser
     attempts = 1
 
     to_return = {
@@ -314,7 +318,7 @@ def get_position():
     }  # you must return all those items to avoid bugs in seacanairy.py (f-e looking for an item which doesn't exist)
 
     while attempts <= 4:
-        reading = get_raw_reading()
+        reading = get_raw_reading(close_UART=False)
         if not reading:  # if it failed to read UART, it returns False
             logger.critical("Unable to read GPS sensor, skipping reading")
             return to_return  # return a dictionary full of "error"
@@ -334,6 +338,7 @@ def get_position():
                     break  # exit the loop and print the data anyway
                 logger.warning("Data missing in GPS transmission, reading again (" + str(attempts) + "/3)")
             else:  # if there are no errors, then exit the loop and proceed
+                ser.close()  # if no more reading necessary, close UART port
                 break
 
     to_return["current time"] = to_return["fix date"] + " " + to_return["current time"]
