@@ -193,7 +193,8 @@ def status(print_information=True):
     logger.debug("Reading sensor status")
     try:
         with SMBus(1) as bus:
-            reading = bus.read_byte_data(CO2_address, 0x71)
+            reading = read_from_custom_memory(0x71, 1)
+            # reading = bus.read_byte_data(CO2_address, 0x71)
         # see documentation for the following decryption
         CO2_status = reading & 0b00001000
         temperature_status = reading & 0b00000010
