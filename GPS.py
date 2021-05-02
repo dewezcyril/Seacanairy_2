@@ -11,7 +11,7 @@ import serial  # UART libraries, to install this library: pip3 install pyserial
 import time
 import yaml
 import logging
-import RPi.GPIO as GPIO
+# import RPi.GPIO as GPIO
 import sys
 import os.path
 
@@ -183,6 +183,8 @@ def decode_NMEA(data):
                         "longitude": "no fix",
                         "SOG": "no fix",
                         "COG": "no fix",
+                        "altitude": "no fix",
+                        "WGS84 correction": "no fix",
                     })
                     return to_return
                 elif GPRMC[2] == "A":  # indicate that GPS is working fine
