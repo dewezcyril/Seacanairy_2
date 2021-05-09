@@ -262,7 +262,6 @@ if not os.path.isfile(csv_file):  # if the file doesn't exist
     to_write = []
     to_write += ["Date/Time"]
 
-
     # for the OPC-N3 sensor:
     to_write += ["PM 1 (μg/m³)", "PM 2.5 (μg/m³)", "PM 10 (μg/m³)",
                  "Temperature OPC (°C)", "Relative Humidity OPC (%RH)",
@@ -302,7 +301,6 @@ if not os.path.isfile(csv_file):  # if the file doesn't exist
 
 else:
     logger.info("'" + str(csv_file) + "' already exist, appending data to this file")
-
 
 print("########### STARTING SENSORS ############")
 
@@ -350,7 +348,6 @@ if CO2_activation:
     print("Synchronize CO2 sensor with Seacanairy sampling period")
     CO2.trigger_measurement(True)  # True == force
 
-
 print("############## SAMPLING! ###############")
 
 # LOOP
@@ -390,7 +387,8 @@ while True:
         flow_period = 4
         flow_number_measurements = 4
         flow_delay = 3
-        flow_thread = threading.Thread(target=flow.start_averaged_measurement, args=[flow_period, flow_number_measurements, flow_delay], daemon=True)
+        flow_thread = threading.Thread(target=flow.start_averaged_measurement,
+                                       args=[flow_period, flow_number_measurements, flow_delay], daemon=True)
         print("Reading flow rate during", flow_period, "seconds after", flow_delay,
               "seconds delay in background (readings will come later...)")
         flow_thread.start()
