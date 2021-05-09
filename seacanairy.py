@@ -350,7 +350,7 @@ if CO2_activation:
 
 print("############## SAMPLING! ###############")
 
-# LOOP
+# LOOP which will run continuously
 
 while True:
     # Get date and time to store in the Excel file
