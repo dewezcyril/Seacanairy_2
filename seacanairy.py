@@ -236,7 +236,7 @@ def wait_timestamp(starting_time):
             print("Waiting before next measurement:", int(to_wait), "seconds (sampling time is set on",
                   sampling_period,
                   "seconds)  ", end="\r")
-            time.sleep(.2)
+            time.sleep(.1)
         else:
             break
 
