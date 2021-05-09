@@ -231,13 +231,16 @@ def wait_timestamp(starting_time):
 
     while True:
         now = time.time()
-        if now < next_launching:
-            to_wait = round(next_launching - now, 0)  # amount of time system will wait
-            print("Waiting before next measurement:", int(to_wait), "seconds (sampling time is set on",
-                  sampling_period,
-                  "seconds)  ", end="\r")
-            time.sleep(.1)
-        else:
+        for i in range(10):
+            if now < next_launching:
+                time.sleep(.1)
+            else:
+                break
+        to_wait = round(next_launching - now, 0)  # amount of time system will wait
+        print("Waiting before next measurement:", int(to_wait), "seconds (sampling time is set on",
+              sampling_period,
+              "seconds)  ", end="\r")
+        if not now < next_launching:
             break
 
     # Delete the waiting countdown and skip a line
