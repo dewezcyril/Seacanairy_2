@@ -1,13 +1,15 @@
-# SEACANAIRY CONFIGURATION FILE
-
+  # SEACANAIRY CONFIGURATION FILE
+# do not change this file syntax!
+# settings must either be Yes or No
+# numbers must be integer (without decimals)
 
 Seacanairy settings:
   # Name of the folder in which the log and data files will be stored:
-  Sampling session name: "threading_trial" #.csv
+  Sampling session name: "sampling_at_the_HZS" #.csv
   # Amount of time between each consecutive measurement
   Sampling period: 60  # seconds
   Flushing time before measurement: 0  # seconds
-  Activate air pump: Yes
+  Activate M&C air pump: Yes
 
 
 CO2 sensor:
@@ -22,11 +24,13 @@ OPC-N3 sensor:
   Activate this sensor: Yes
   # Amount of time at which the fan keep running to refresh the air inside the sensor casing
   Flushing time: 4
-    # Amount of time at which the laser is kept on and measure the air
-    # This period will be multiplied by 2 because the sensor automatically take a
-  # measurement in high gain and in low gain mode
+  # Amount of time at which the laser is kept on and measure the air
+  # This period will be multiplied by 2 in practice because the sensor automatically take a
+  # first measurement in high gain and then another one in low gain mode
   Sampling time: 4
   Fan speed: 100 # 0 = the slowest, 100 = the fastest
+  # In case of data transmission error, take another sample (Yes) or
+  # read the data again even if sampling time is really short (No)
   Take a new measurement if checksum is wrong (avoid shorter sampling periods when errors): Yes
   Store debug messages (important increase of logs): No
 
@@ -40,69 +44,3 @@ Air flow sensor:
 GPS:
   Activate this sensor: Yes
   Store debug messages (important increase of logs): No
-
-
-AFE Board:
-  Activate this sensor: Yes
-  Store debug messages (important increase of logs): No
-  Calibration:
-    # Calibration settings
-    NO2:
-      Calibration version number: 1
-      Calibration name: "Lukas"
-      Calibration date: "june 2020"
-      WE SENS: 0.292511  # mV/ppb
-      WE 0,e: 305.5  # mV
-      AE 0,e: 314,5  # mV
-      WE 0,s: -23,506  # mV
-      AE 0,s: -11,242  # mV
-      WE 0: 281,994  # mV
-      AE 0: 303,258  # mV
-
-    OX:
-      Calibration version number: 1
-      Calibration name: "Lukas"
-      Calibration date: "june 2020"
-      WE SENS: 0.3701465  # mV/ppb
-      WE SENS NO2: 0,42175  # mV/ppb
-      WE 0,e: 366.5  # mV
-      AE 0,e: 414  # mV
-      WE 0,s: -49.939  # mV
-      AE 0,s: -8,519  # mV
-      WE 0: 316.561  # mV
-      AE 0: 405.481  # mV
-
-    SO2:
-      Calibration version information:
-        Version number: 1
-        Calibration name: "Lukas"
-        Calibration date: "june 2020"
-      WE SENS: 0.29688  # mV/ppb
-      WE 0,e: 315  # mV
-      AE 0,e: 289.5  # mV
-      WE 0,s: -12.64  # mV
-      AE 0,s: 7.28  # mV
-      WE 0: 327.64  # mV
-      AE 0: 296.78  # mV
-
-    CO:
-      Calibration version information:
-        Version number: 1
-        Calibration name: "Lukas"
-        Calibration date: "june 2020"
-      WE SENS: 0.2776  # mV/ppb
-      WE 0,e: 305.5  # mV
-      AE 0,e: 301  # mV
-      WE 0,s: -28.24  # mV
-      AE 0,s: 25.76  #mV
-      WE 0: 277.26  # mV
-      AE 0: 326.76  #mV
-
-    Temperature:
-      Calibration version information:
-        Version number: 1
-        Calibration name: "Lukas"
-        Calibration date: "june 2020"
-      Thermal sensitivity: 1  # mV/°C
-      Vkal: 314  # mV/°C
-      Tkal: 18  # °C
