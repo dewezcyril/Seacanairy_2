@@ -120,8 +120,8 @@ def loading_bar(name, delay):
     """
     Show a loading bar on the screen during a a certain amount of time
     Make the user understand the software is doing/waiting for something
-    :param name: Text to be shown on the left of the loading bar
-    :param length: Amount of time the system is waiting in seconds
+    :param name: Text to be shown on the left of the loading bar (waiting, sampling…)
+    :param length: Amount of time the system is waiting (seconds)
     :return: nothing
     """
     bar = IncrementalBar(name, max=(2 * delay), suffix='%(elapsed)s/' + str(delay) + ' seconds')
@@ -135,7 +135,7 @@ def loading_bar(name, delay):
 def digest(buf):
     """
     Calculate the CRC8 checksum (based on the CO2 documentation example)
-    :param buf: List[bytes to digest]
+    :param buf: List of bytes to digest [bytes to digest]
     :return: checksum
     """
     # Translation of the C++ code given in the documentation
@@ -164,7 +164,7 @@ def check(checksum, data):
     """
     Check that the data transmitted are correct using the data and the given checksum
     :param checksum: Checksum given by the sensor (see sensor doc)
-    :param data: List[bytes to be used in the checksum calculation (see sensor doc)]
+    :param List of bytes transmitted by the sensor before the checksum (see sensor doc)
     :return: True if the data are correct, False if not
     """
     calculation = digest(data)
@@ -188,13 +188,13 @@ def status(print_information=True):
     Read the status byte of the CO2 sensor
     !! It will trigger a new measurement if the previous one is older than 10 seconds
     :param: print_information: Optional: False to hide the messages
-    :return: List[CO2 status, temperature status, humidity status]
+    :return: True if last measurement is OK, False if NOK
     """
     logger.debug("Reading sensor status")
     try:
         with SMBus(1) as bus:
-            reading = read_from_custom_memory(0x71, 1)
-            # reading = bus.read_byte_data(CO2_address, 0x71)
+            # reading = read_from_custom_memory(0x71, 1)
+            reading = bus.read_byte_data(CO2_address, 0x71)
         # see documentation for the following decryption
         CO2_status = reading & 0b00001000
         temperature_status = reading & 0b00000010
@@ -213,8 +213,10 @@ def status(print_information=True):
             else:
                 logger.warning("Humidity status is NOK")
         if CO2_status or humidity_status != 0:
+            # Only CO2_status and humidity_status, because for no known reason temperature status is always NOK
             return False
         else:
+            # Everything is OK
             return True
     except:
         logger.critical("Failed to read sensor status")
@@ -223,8 +225,8 @@ def status(print_information=True):
 
 def getRHT():
     """
-    Get the last Temperature and Relative Humidity taken by the CO2 sensor
-    :return:  Dictionary{"RH", "temperature"}
+    Read the last Temperature and Relative Humidity measured, process the bytes, check checksum, convert in °C and %RH
+    :return:  Dictionary with the following items {"RH", "temperature"}
     """
     logger.debug("Reading RH and Temperature from CO2 sensor")
 
@@ -294,9 +296,9 @@ def getRHT():
 
 def getCO2P():
     """
-    Get the last CO2 instant and pressure reading of the CO2 sensor, and get the CO2 average
-
-    :return: Dictionary{"average", "instant", "pressure"}
+    Read the last CO2 instant, CO2 average and pressure measurements, process the bytes, check checksum,
+    convert in hPa and ppm
+    :return: Dictionary containing the following items {"average", "instant", "pressure"}
     """
     logger.debug('Reading of CO2 and pressure')
 
@@ -370,8 +372,9 @@ def getCO2P():
 
 def get_data():
     """
-    Read all the data available from the CO2 sensor
-    :return: Dictionary{"pressure", "temperature", "CO2 average", "CO2 instant"}
+    Get all the available data from the CO2 sensor (CO2 instant/average, pressure, temperature, humidity
+    :return:    Dictionary containing the following items
+                {"pressure", "temperature", "CO2 average", "CO2 instant", "relative humidity"}
     """
     # Read status byte
     # attempts = 1
@@ -403,8 +406,8 @@ def internal_timestamp(new_timestamp=None):
     """
     Read the internal sampling period of the CO2 sensor
     To change the value, write it between the brackets (in seconds)
-    :param new_timestamp: Nothing to read, new value in seconds to change it
-    :return: internal sampling period of the sensor
+    :param new_timestamp: None or empty to read, new value in seconds to change it
+    :return: Actual internal sampling period of the sensor
     """
     if new_timestamp is not None:  # if user write something as input in the brackets (arguments)
         if not 15 <= new_timestamp <= 3600:
@@ -431,12 +434,13 @@ def internal_timestamp(new_timestamp=None):
 
 def trigger_measurement(force=False):
     """
-    Ask the CO2 sensor to start a new measurement now if the previous one is older than 10 seconds
+    Request a new CO2, t°, pressure and RH measurement IF the previous one is older than 10 seconds
+    Force to avoid the previous 10 seconds condition
     Same function as 'status()'
-    :param: force:  True to apply the function two consecutive time to be sure that the sensor is well
+    :param: force:  True to apply the function two consecutive times to be sure that the sensor is well
                     synchronized with the seacanairy
-                    False to apply it once (during the main loop of the Seacanairy for example
-    :return: Status of the sensor: List[CO2 status, temperature status, humidity status]
+                    False to apply it once (during the main loop of the Seacanairy for example)
+    :return: True or False if status if OK or NOK
     """
     print("Triggering a new measurement...", end='\r')
 
@@ -458,9 +462,9 @@ def trigger_measurement(force=False):
 
 def read_internal_calibration(item):
     """
-    Read the internal calibration of the sensor, indicate which calibration you want to read
-    :param item: 'relative humidity', 'temperature', 'pressure', 'CO2', 'all'
-    :return: List[offset, gain, lower_limit, upper_limit]
+    Read the internal calibration of a particular sensor item
+    :param item: indicate which internal calibration to read: 'relative humidity', 'temperature', 'pressure', 'CO2', 'all'
+    :return: List containing the calibration settings [offset, gain, lower_limit, upper_limit]
     """
     if item == 'relative humidity':
         index = 0x01
@@ -518,7 +522,7 @@ def read_internal_calibration(item):
 
 def read_from_custom_memory(index, number_of_bytes):
     """
-    Read data from specified custom memory address in the CO2 sensor
+    Read bytes from specified custom memory address in the CO2 sensor internal memory
     :param index: index of the data to be read (see sensor doc)
     :param number_of_bytes: number of bytes to read (see sensor doc)
     :return: list[bytes] from right to left
@@ -553,9 +557,9 @@ def read_from_custom_memory(index, number_of_bytes):
 
 def write_to_custom_memory(index, *bytes_to_write):
     """
-    Write data to a custom memory address in the CO2 sensor
+    Write data to a custom memory address in the CO2 sensor internal memory
     :param index: index of the customer memory to write (see sensor doc)
-    :param bytes_to_write: unlimited amount of bytes to write
+    :param bytes_to_write: unlimited amount of bytes to write into the internal custom memory at index (see sensor doc)
     :return: True (Success) or False (Fail)
     """
     logger.debug("Writing " + str(bytes_to_write) + " inside custom memory at index " + str(hex(index)) + "...")
