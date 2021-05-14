@@ -1,45 +1,53 @@
 #!/bin/sh
 
-echo "Check the system time"
+printf "Check the system time: "
 date
-echo "Is the current date and time correct? " ; read -r "[Y/n]:" answer
+printf "Is the current date and time correct? [Y/n] " ; read -r  answer
 if [ $answer == "Y" ] ;
 then
-  echo "Exiting time setting"
+  printf "Exiting time setting"
   sleep 1
   exit
 fi
 if [ $answer == "n" ] ;
 then
-  echo "RTC time is"
+  printf "RTC time is: "
   sudo hwclock -r
-  echo "Is that time correct? " ; read -r "[Y/n]:" answer
+  printf "Is that time correct? [Y/n] " ; read -r answer
 fi
 if [ $answer == "Y" ] ;
 then
-  echo "Applying RTC time to the system"
+  printf "Applying RTC time to the system"
   sudo hwclock -s
-  echo "System time is now:"
+  printf "\nSystem time is now "
   date
-  echo "Exiting this shell script"
+  printf "Exiting this shell script\n"
   sleep 1
   exit
 fi
 if [ $answer == "n" ] ;
 then
-  echo "Connect the Central Computer to the internet and wait for its automatic synchronization"
-  echo "Or type hereafter the date in the following format: YYYY-MM-DD (2001-09-11)"
-  read date_input
-  sudo date +%F -s "$date_input"
-  echo "Type now the current time in the following format: hh:mm:ss (12:30:55)"
-  read time_input
-  sudo date +%T -s "$time_imput"
-  echo "Time is now:"
-  date
-  echo "Writing current time inside the RTC"
-  sudo hwclock -w
-  echo "Exiting this shell script"
+  printf "Is the computer connected to the internet? [Y/n] " ; read -r  answer
+  if [ $answer == "Y" ] ;
+  then
+    printf "Let some time to the system to get time from the internet"
+    printf "\nShell script will close\nExecute this script again in one minute\n"
+    sleep 5
+    exit
+  fi
+  if [ $answer == "n" ] ;
+  then
+    printf "Type hereafter the date in the following format: YYYY-MM-DD (2001-09-11): " ; read -r date_input
+    sudo date +%F -s "$date_input"
+    printf "Type now the current time in the following format: hh:mm:ss (12:30:55): " ; read -r time_input
+    sudo date +%T -s "$time_input"
+    printf "Date and Time are now: "
+    date
+    printf "\nWriting current time inside RTC..."
+    sudo hwclock -w
+    printf "Exiting this shell script\n"
   sleep 1
   exit
+  fi
 fi
 exit
