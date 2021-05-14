@@ -112,7 +112,7 @@ if air_pump_activation:
     import RPi.GPIO as GPIO  # to put GPIO high/low to switch the air pump relay on and off
 
 if flow_sensor_activation:
-    import sensirion_mass_flow_meter as flow
+    import flow as flow
 
 # -----------------------------------------
 # LOGGING
@@ -290,15 +290,15 @@ if not os.path.isfile(csv_file):  # if the file doesn't exist
     # for the flow sensor:
     to_write += ["flow (sccm)", "flow (slm)", "flow (slh)"]
 
-    # for the CO2 sensor:
-    to_write += ["Relative Humidity (%RH)", "Temperature (°C)", "Pressure (hPa)",
-                 "CO2 average (ppm)", "CO2 instant (ppm)"]
-
     # for the GPS:
     to_write += ["Date and time (UTC)",
                  "GPS fix date and time (UTC)", "latitude", "longitude", "SOG (kts)", "COG",
                  "horizontal dilution of precision", "accuracy",
                  "altitude (m)", "WGS84 correction (m)", "fix type", "GPS status"]
+
+    # for the CO2 sensor:
+    to_write += ["Relative Humidity (%RH)", "Temperature (°C)", "Pressure (hPa)",
+                 "CO2 average (ppm)", "CO2 instant (ppm)"]
 
     append_data_to_csv(to_write)
 
@@ -397,7 +397,7 @@ while True:
         flow_thread.start()
         # Get OPC-N3 sensor data (see 'OPCN3.py')
         print("********************* OPC-N3 *********************")
-        OPC_data = OPCN3.getdata(OPC_flushing_time, OPC_sampling_time)
+        OPC_data = OPCN3.get_data(OPC_flushing_time, OPC_sampling_time)
         to_write += [OPC_data["PM 1"], OPC_data["PM 2.5"], OPC_data["PM 10"],
                      OPC_data["temperature"], OPC_data["relative humidity"],
                      OPC_data["sampling time"], OPC_data["sample flow rate"],
@@ -445,12 +445,6 @@ while True:
         pump_stop()
         print("Air pump is off (pump has run", round(time.time() - start, 0), "seconds)")
 
-    if CO2_activation:
-        # Get CO2 sensor data (see 'CO2.py')
-        print("******************* CO2 SENSOR *******************")
-        CO2_data = CO2.get_data()
-        to_write += [CO2_data["relative humidity"], CO2_data["temperature"], CO2_data["pressure"],
-                     CO2_data["average"], CO2_data["instant"]]
     if GPS_activation:
         # print("Wait switching from SPI to UART...", end='\r')
         # time.sleep(1)  # avoid too close communication between SPI of OPC and UART of GPS
@@ -461,6 +455,14 @@ while True:
                      GPS_data["latitude"], GPS_data["longitude"],
                      GPS_data["SOG"], GPS_data["COG"], GPS_data["horizontal precision"], GPS_data["accuracy"],
                      GPS_data["altitude"], GPS_data["WGS84 correction"], GPS_data["fix status"], GPS_data["status"]]
+
+    if CO2_activation:
+        # Get CO2 sensor data (see 'CO2.py')
+        print("******************* CO2 SENSOR *******************")
+        CO2_data = CO2.get_data()
+        to_write += [CO2_data["relative humidity"], CO2_data["temperature"], CO2_data["pressure"],
+                     CO2_data["average"], CO2_data["instant"]]
+
 
     # Store everything in the csv file
     append_data_to_csv(now, to_write)
