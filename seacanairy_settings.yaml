@@ -1,11 +1,14 @@
   # SEACANAIRY CONFIGURATION FILE
-# do not change this file syntax!
-# settings must either be Yes or No
-# numbers must be integer (without decimals)
+
+# Recommendations
+  # do not change the file syntax
+  # settings must either be Yes or No
+  # numbers must be integer (without decimals)
+  # After changing any settings, check that the Software still work
 
 Seacanairy settings:
   # Name of the folder in which the log and data files will be stored:
-  Sampling session name: "last_long_term_test" #.csv
+  Sampling session name: "sampling_at_the_HZS_example" #.csv
   # Amount of time between each consecutive measurement
   Sampling period: 60  # seconds
   Flushing time before measurement: 0  # seconds
@@ -15,7 +18,7 @@ Seacanairy settings:
 CO2 sensor:
   Activate this sensor: Yes
   Automatic sampling frequency (number of sample during the above sampling period): 1
-  Amount of time required for the sensor to take the measurement: 10  # seconds (Default value: 10 seconds)
+  Amount of time required for the sensor to take the measurement: 10  # seconds (default value: 10 seconds)
   Store debug messages (important increase of logs): No
   Number of reading attempts: 3
 
@@ -37,7 +40,7 @@ OPC-N3 sensor:
 
 Air flow sensor:
   Activate this sensor: Yes
-  Measure during OPCN3 measurement: Yes
+  Measure during OPCN3 measurement: Yes  # measure the flow rate during the Particulate Matter OPCN3 measurement
   Store debug messages (important increase of logs): No
 
 
@@ -45,7 +48,9 @@ GPS:
   Activate this sensor: Yes
   Store debug messages (important increase of logs): No
 
+
 AFE Board:
   Activate this sensor: Yes
   Store debug messages (important increase of logs): No
+  # Perform multiple readings and average them to reduce noise
   Noise reduction - number of reading averaged: 4
