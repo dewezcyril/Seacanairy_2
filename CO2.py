@@ -173,9 +173,9 @@ def check(checksum, data):
         return True
     else:
         logger.debug("CRC8 does not fit, data are wrong")
-        logger.error("Checksum is wrong, sensor checksum is: " + str(checksum) +
-                     ", seacanairy checksum is: " + str(calculation) +
-                     ", data returned by the sensor is:" + str(data))
+        logger.error("Checksum is wrong, sensor checksum: " + str(checksum) +
+                     ", seacanairy checksum: " + str(calculation) +
+                     ", data returned:" + str(data))
         if data[0] and data[1] == 0:
             logger.debug("Sensor returned 0 values, it is not ready, waiting a little bit")
             print("Sensor not ready, waiting...", end='\r')
@@ -253,11 +253,11 @@ def getRHT():
 
             except:  # what happens if the i2c fails
                 if reading_trials == max_attempts:
-                    logger.critical("i2c transmission failed "
+                    logger.critical("i2c failure "
                                     + str(max_attempts) + "consecutive times, skipping this RH and temperature reading")
                     return data  # indicate clearly that data are wrong
 
-                logger.error("Error in the i2c transmission (" + str(sys.exc_info())
+                logger.error("i2c failure (" + str(sys.exc_info())
                              + "), trying again... (" + str(reading_trials + 1) + "/" + str(max_attempts) + ")")
                 reading_trials += 1  # increment of reading_trials
                 time.sleep(3)  # if transmission fails, wait a bit to try again (sensor is maybe busy)
@@ -326,12 +326,12 @@ def getCO2P():
 
             except:  # what happens if the i2c fails
                 if reading_trials == max_attempts:
-                    logger.critical("i2c transmission failed "
+                    logger.critical("i2c failure "
                                     + str(max_attempts) + " consecutive times, skipping CO2 and pressure reading (" +
                                     str(sys.exc_info()) + ")")
                     return data  # indicate clearly that the data are wrong
 
-                logger.error("Error in the i2c transmission, trying again... (" + str(sys.exc_info()) + ")")
+                logger.error("i2c failure, trying again... (" + str(sys.exc_info()) + ")")
                 reading_trials += 1  # increment of reading_trials
                 print("Waiting 3 seconds...", end='\r')
                 time.sleep(3)  # if I²C comm fails, wait a little bit and try again (sensor is maybe busy)
