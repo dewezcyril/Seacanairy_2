@@ -59,6 +59,9 @@ OPC_sampling_time = settings['OPC-N3 sensor']['Sampling time']
 # OPCN3 Fan speed (0-100)
 OPC_fan_speed = settings['OPC-N3 sensor']['Fan speed']
 
+# Number of reading AFE must take and average
+AFE_readings_averaged = settings['AFE Board']['Noise reduction - number of reading averaged']
+
 # Let the user choose if he want to activate the following sensor or not
 # Seen the problems encountered with GPS and OPCN3, could be good to disable the unnecessary sensors (GPS f-e)
 # This does not shut down the sensor alimentation
@@ -66,7 +69,7 @@ CO2_activation = settings['CO2 sensor']['Activate this sensor']
 OPCN3_activation = settings['OPC-N3 sensor']['Activate this sensor']
 GPS_activation = settings['GPS']['Activate this sensor']
 AFE_activation = settings['AFE Board']['Activate this sensor']
-air_pump_activation = settings['Seacanairy settings']['Activate air pump']
+air_pump_activation = settings['Seacanairy settings']['Activate M&C air pump']
 flow_sensor_activation = settings['Air flow sensor']['Activate this sensor']
 OPCN3_flow_measurement = settings['Air flow sensor']['Measure during OPCN3 measurement']
 
@@ -307,7 +310,8 @@ if not os.path.isfile(csv_file):  # if the file doesn't exist
     append_data_to_csv(to_write)
 
 else:
-    logger.info("'" + str(csv_file) + "' already exist, appending data to this file")
+    logger.info("'" + str(csv_file) + "' already exist")
+    logger.info("Appending data to this file")
 
 print("########### STARTING SENSORS ############")
 
@@ -386,11 +390,11 @@ while True:
     # [a, b, c] + [d, e, f] = [a, b, c, d, e, f]
 
     if CO2_activation:
-        print("Trigger CO2 measurement (readings will come later...)")
+        print("Triggering CO2 measurement (readings will come later...)")
         CO2.trigger_measurement()
 
     if AFE_activation:
-        AFE_thread = threading.Thread(target=AFE.start_averaged_data, args=[4], daemon=True)
+        AFE_thread = threading.Thread(target=AFE.start_averaged_data, args=[AFE_readings_averaged], daemon=True)
         print("Reading averaged AFE in background (readings will come later...)")
         AFE_thread.start()
 
@@ -399,11 +403,12 @@ while True:
         flow_period = 4
         flow_number_measurements = 4
         flow_delay = 3
-        flow_thread = threading.Thread(target=flow.start_averaged_measurement,
-                                       args=[flow_period, flow_number_measurements, flow_delay], daemon=True)
-        print("Reading flow rate during", flow_period, "seconds after", flow_delay,
-              "seconds delay in background (readings will come later...)")
-        flow_thread.start()
+        if OPCN3_flow_measurement:
+            flow_thread = threading.Thread(target=flow.start_averaged_measurement,
+                                           args=[flow_period, flow_number_measurements, flow_delay], daemon=True)
+            print("Reading flow rate during", flow_period, "seconds after", flow_delay,
+                  "seconds delay in background (readings will come later...)")
+            flow_thread.start()
         # Get OPC-N3 sensor data (see 'OPCN3.py')
         print("********************* OPC-N3 *********************")
         OPC_data = OPCN3.get_data(OPC_flushing_time, OPC_sampling_time)
@@ -423,19 +428,20 @@ while True:
                      OPC_data["reject count out of range"],
                      OPC_data["fan revolution count"], OPC_data["laser status"]]
 
-        print("**************** OPC FLOW AVERAGE ****************")
-        print("Finishing reading averaged flow rate...", end='\r')
-        flow_thread.join()
-        print("                                        ", end='\r')
-        flow_OPC_data = flow.get_averaged_measurement()
-        to_write += [flow_OPC_data['average flow [sccm]'], flow_OPC_data['average flow [slm]'],
-                     flow_OPC_data['average flow [slh]']]
+        if OPCN3_flow_measurement:
+            print("**************** OPC FLOW AVERAGE ****************")
+            print("Finishing reading averaged flow rate...", end='\r')
+            flow_thread.join()  # wait the end of the thread
+            print("                                        ", end='\r')
+            flow_OPC_data = flow.get_averaged_measurement()
+            to_write += [flow_OPC_data['average flow [sccm]'], flow_OPC_data['average flow [slm]'],
+                         flow_OPC_data['average flow [slh]']]
 
     if AFE_activation:
         # Get OPC-N3 sensor data (see 'AFE.py')
         print("****************** AFE BOARD ********************")
-        print("Finishing reading averaged AFE...", end='\r')
-        AFE_thread.join()
+        print("Finishing reading background averaged AFE...", end='\r')
+        AFE_thread.join()  # wait the end of the thread
         print("                                  ", end='\r')
         AFE_data = AFE.get_averaged_data()
         to_write += [AFE_data["temperature"], AFE_data["temperature raw"],

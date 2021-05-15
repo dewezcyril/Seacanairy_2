@@ -5,7 +5,7 @@
 
 Seacanairy settings:
   # Name of the folder in which the log and data files will be stored:
-  Sampling session name: "sampling_at_the_HZS" #.csv
+  Sampling session name: "last_long_term_test" #.csv
   # Amount of time between each consecutive measurement
   Sampling period: 60  # seconds
   Flushing time before measurement: 0  # seconds
@@ -44,3 +44,8 @@ Air flow sensor:
 GPS:
   Activate this sensor: Yes
   Store debug messages (important increase of logs): No
+
+AFE Board:
+  Activate this sensor: Yes
+  Store debug messages (important increase of logs): No
+  Noise reduction - number of reading averaged: 4
