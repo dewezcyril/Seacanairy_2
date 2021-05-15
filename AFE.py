@@ -344,7 +344,7 @@ def apply_calibration(dictionary):
     return dictionary
 
 
-def getdata():
+def get_data():
     """
     Get all available data from the 4-AFE Alphasense Board (one instant reading)
     :return: Dictionary{'NO2 ppm', NO2 main', 'NO2 aux', 'OX ppm', 'OX main', 'OX aux',
@@ -497,6 +497,7 @@ def get_averaged_data():
 
     data = apply_calibration(thread_data)
 
+    print("\t\tppm\t|\tmain (mV)\t\t|\taux (mV)")
     print("NO2:\t", data["NO2 ppm"],"\t|\t", data["NO2 main"], "\t|\t", data["NO2 aux"])
     print("OX:\t", data["OX ppm"], "\t|\t", data["OX main"], "\t|\t", data["OX aux"])
     print("SO2:\t", data["SO2 ppm"], "\t|\t", data["SO2 main"], "\t|\t", data["SO2 aux"])
