@@ -206,7 +206,7 @@ def initiate_transmission(command_byte):
             logger.critical("Failed to initiate transmission (reset 3 times SPI, still error)")
             return False
 
-    logger.critical("Transmission initiation took too much time (> "
+    logger.critical("Transmission initiation timeout (> "
                     + str(time_available_for_initiate_transmission) + " secs)")
     return False  # function depending on initiate_transmission function will not continue, indicate error
 
@@ -830,7 +830,7 @@ def read_histogram(sampling_period):
             return to_return
 
 
-def getdata(flushing_time, sampling_time):
+def get_data(flushing_time, sampling_time):
     """
     Get all the possible data from the OPC-N3 sensor
     Start the fan, start the laser, get the data, turn off the laser and the fan
@@ -944,6 +944,24 @@ def set_fan_speed(speed):
         logger.error("Failed to set the fan speed")
 
 
+def initialization_SPI():
+    """
+    Initialize the OPCN3 SPI system
+    To be executed on time only after powering up the OPCN3
+    :return: nothing
+    """
+    print("Initializing OPCN3 SPI...")
+
+    # First OPCN3 communication is always lost (personal investigation)
+    # So start by sending random bytes (initialization byte f-e) to wake it up, and then do nothing
+    # We know after this step, seacanairy.py will initiate CO2 sensor, so we should have
+    # enough time let the OPCN3 SPI to flush
+
+    spi.xfer([0x42] * 20)  # initiate control of power state
+
+    return
+
+
 if __name__ == '__main__':
     # The code below runs if you execute this code from this file (you must execute OPC-N3 and not seacanairy)
     while True:
@@ -962,6 +980,6 @@ if __name__ == '__main__':
         # print("sleep")
         # time.sleep(3)
 
-        getdata(2, 3)
+        get_data(2, 3)
         print("sleep")
         time.sleep(5)

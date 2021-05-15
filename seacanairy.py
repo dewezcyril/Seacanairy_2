@@ -84,10 +84,15 @@ if not os.path.exists(directory_path):
     print("Created directory", directory_path)
 
 # Create a file to store the log if it doesn't exist
-log_file = directory_path + project_name + "-log.log"
+log_file = directory_path + "/" + project_name + "-log.log"
 if not os.path.isfile(log_file):
     os.mknod(log_file)  # create the file
     print("Created log file", log_file)
+else:
+    # Add a line to separate different executions
+    file_logfile = open(log_file, "a")
+    file_logfile.write("******************************** NEW SESSION **********************\n")
+    file_logfile.close()
 # You can't go further in the program without creating the folder and the logger file
 
 # -----------------------------------------
@@ -127,7 +132,6 @@ logging.basicConfig(level=message_level,
                     datefmt='%d-%m %H:%M:%S',
                     filename=log_file,
                     filemode='a')
-logging.info("***********************************************")
 # define a Handler which writes INFO messages or higher to the sys.stderr/display
 console = logging.StreamHandler()
 console.setLevel(message_level)
@@ -343,13 +347,18 @@ else:  # if user don't want to use the sensor...
         pass  # nothing to do if it fails
 
 if OPCN3_activation:
-    # Set the desired OPC fan speed
-    OPCN3.set_fan_speed(OPC_fan_speed)
+    # Initialize OPCN3 SPI, avoid loosing first communication
+    OPCN3.initialization_SPI()
 
 if CO2_activation:
     # Ask the CO2 sensor to take a new sample
     print("Synchronize CO2 sensor with Seacanairy sampling period")
     CO2.trigger_measurement(True)  # True == force
+
+if OPCN3_activation:
+    # Set the desired OPC fan speed
+    OPCN3.set_fan_speed(OPC_fan_speed)
+
 
 print("############## SAMPLING! ###############")
 
