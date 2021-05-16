@@ -950,7 +950,7 @@ def initialization_SPI():
     To be executed on time only after powering up the OPCN3
     :return: nothing
     """
-    print("Initializing OPCN3 SPI...")
+    print("Initializing OPCN3 SPI")
 
     # Make any communication to start the Sensor SPI
     # Personal investigations shows that first communication is always lost

@@ -15,13 +15,18 @@ import logging  # to store the errors messages in a separate log file
 import threading
 
 # ---------------------------------------
+# HELLO
+# ---------------------------------------
+print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+print("~~~~~~~~~~~~~~~~ SEACANAIRY ~~~~~~~~~~~~~~~~")
+print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+
+# ---------------------------------------
 # CHECK THE TIME
 # ---------------------------------------
-print("################# TIME #################")
+print("\n################# TIME #################")
 print("Current date and time is:", datetime.now())
-print("If time is not correct, execute:")
-print("\tsudo hwclock -s\t\tapply RTC time to the system")
-print("\ttimedatectl\t\tshow current time status")
+print("If time is not correct, close this window and click on 'Check Date and Time'")
 
 # ---------------------------------------
 # SETTINGS
@@ -29,7 +34,7 @@ print("\ttimedatectl\t\tshow current time status")
 # Import the settings from the Yaml file
 # Store the different settings in dedicated variables to get it more easy
 
-print("################ FILES #################")
+print("\n################ FILES #################")
 
 current_working_directory = str(os.getcwd())  # returns the path where the python script is currently running
 
@@ -94,7 +99,7 @@ if not os.path.isfile(log_file):
 else:
     # Add a line to separate different executions
     file_logfile = open(log_file, "a")
-    file_logfile.write("******************************** NEW SESSION **********************\n")
+    file_logfile.write("********************** NEW SESSION **********************\n")
     file_logfile.close()
 # You can't go further in the program without creating the folder and the logger file
 
@@ -313,7 +318,7 @@ else:
     logger.info("'" + str(csv_file) + "' already exist")
     logger.info("Appending data to this file")
 
-print("########### STARTING SENSORS ############")
+print("\n########### STARTING SENSORS ############")
 
 # Keep a trace of the day and time at which the system has started
 
@@ -356,7 +361,7 @@ if OPCN3_activation:
 
 if CO2_activation:
     # Ask the CO2 sensor to take a new sample
-    print("Synchronize CO2 sensor with Seacanairy sampling period")
+    print("Synchronizing CO2 sensor with Seacanairy sampling period")
     CO2.trigger_measurement(True)  # True == force
 
 if OPCN3_activation:
@@ -364,7 +369,7 @@ if OPCN3_activation:
     OPCN3.set_fan_speed(OPC_fan_speed)
 
 
-print("############## SAMPLING! ###############")
+print("\n############## SAMPLING! ###############")
 
 # LOOP which will run continuously
 
