@@ -64,7 +64,7 @@ AFE_readings_averaged = settings['AFE Board']['Noise reduction - number of readi
 
 # Let the user choose if he want to activate the following sensor or not
 # Seen the problems encountered with GPS and OPCN3, could be good to disable the unnecessary sensors (GPS f-e)
-# This does not shut down the sensor alimentation
+# This does not shut down the sensor powering
 CO2_activation = settings['CO2 sensor']['Activate this sensor']
 OPCN3_activation = settings['OPC-N3 sensor']['Activate this sensor']
 GPS_activation = settings['GPS']['Activate this sensor']
@@ -390,12 +390,12 @@ while True:
     # [a, b, c] + [d, e, f] = [a, b, c, d, e, f]
 
     if CO2_activation:
-        print("Triggering CO2 measurement (readings will come later...)")
+        print("Triggering CO2 measurement (measurement reading will come later...)")
         CO2.trigger_measurement()
 
     if AFE_activation:
         AFE_thread = threading.Thread(target=AFE.start_averaged_data, args=[AFE_readings_averaged], daemon=True)
-        print("Reading averaged AFE in background (readings will come later...)")
+        print("Reading averaged AFE in background (data will show up later...)")
         AFE_thread.start()
 
     if OPCN3_activation:
