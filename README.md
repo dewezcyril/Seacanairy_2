@@ -12,6 +12,7 @@
 * **`seacanairy_settings.yaml`**: file containing the settings for the other files
 * **`GPS.py`**: code to get the position, time, speed, COG, from the [U-BLOX-7 GNSS module](https://www.u-blox.com/sites/default/files/products/documents/NEO-7_DataSheet_%28UBX-13003830%29.pdf).
  Convert the NMEA serial lines to longitude, latitude, time, date...
+* **`set_system_time.sh`**: shell script to help user checking current system time, getting it from RTC, or setting it manually. RTC synchronization is automatic at Raspberry Startup, but can be manually triggered by this script. Usefull for any Raspberry Pi not connected to the internet.
 * _**`draft.py`**: draft document where ideas and non-used part of code are stored_
 
 _Other files are no more used_
