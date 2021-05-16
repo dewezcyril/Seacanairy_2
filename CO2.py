@@ -175,7 +175,7 @@ def check(checksum, data):
         logger.debug("CRC8 does not fit, data are wrong")
         logger.error("Checksum is wrong, sensor checksum: " + str(checksum) +
                      ", seacanairy checksum: " + str(calculation) +
-                     ", data returned:" + str(data))
+                     ", bytes returned:" + str(data) + str(checksum))
         if data[0] and data[1] == 0:
             logger.debug("Sensor returned 0 values, it is not ready, waiting a little bit")
             print("Sensor not ready, waiting...", end='\r')
@@ -219,7 +219,7 @@ def status(print_information=True):
             # Everything is OK
             return True
     except:
-        logger.critical("Failed to read sensor status")
+        logger.critical("Status reading failure")
         return True  # try to go ahead in all cases
 
 
@@ -273,7 +273,7 @@ def getRHT():
             print("Temperature is:", temperature, "°C", end="")
             print("\t| Relative humidity is:", relative_humidity, "%RH")
 
-            # Create a dictionnary containing all the data
+            # Create a dictionary containing all the data
             data = {
                 "relative humidity": relative_humidity,
                 "temperature": temperature
