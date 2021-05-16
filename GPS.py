@@ -321,6 +321,7 @@ def get_position():
         reading = get_raw_reading(close_UART=False)
         if not reading:  # if it failed to read UART, it returns False
             logger.critical("Unable to read GPS sensor, skipping reading")
+            ser.close()  # if no more reading necessary, close UART port
             return to_return  # return a dictionary full of "error"
         else:
             try:  # avoid errors because of 'I don't know why the sensor sometimes delete items in the NMEA at random'
@@ -335,6 +336,7 @@ def get_position():
                 attempts += 1
                 if attempts >= 4:  # if the system has tried 3 times to read the data but that there are still errors
                     logger.error("Tried 3 times to get full GPS data, still a value 'error'")
+                    ser.close()  # if no more reading necessary, close UART port
                     break  # exit the loop and print the data anyway
                 logger.warning("Data missing in GPS transmission, reading again (" + str(attempts) + "/3)")
             else:  # if there are no errors, then exit the loop and proceed
