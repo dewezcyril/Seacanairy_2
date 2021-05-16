@@ -952,12 +952,10 @@ def initialization_SPI():
     """
     print("Initializing OPCN3 SPI...")
 
-    # First OPCN3 communication is always lost (personal investigation)
-    # So start by sending random bytes (initialization byte f-e) to wake it up, and then do nothing
-    # We know after this step, seacanairy.py will initiate CO2 sensor, so we should have
-    # enough time let the OPCN3 SPI to flush
+    # Make any communication to start the Sensor SPI
+    # Personal investigations shows that first communication is always lost
 
-    spi.xfer([0x42] * 20)  # initiate control of power state
+    read_DAC_power_status()
 
     return
 
